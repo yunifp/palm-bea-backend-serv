@@ -1,0 +1,37 @@
+stages:
+  - deploy
+
+deploy_production:
+  stage: deploy
+  tags:
+    - pelari-kalcer
+
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: on_success
+    - when: never
+
+  before_script:
+    - echo ">>> Running as user:"
+    - whoami
+    - echo ">>> Docker version:"
+    - docker --version
+
+  script:
+    - echo ">>> Masuk project directory"
+    - cd /var/www/palma-beasiswa/palma-backend-beasiswa-service
+
+    - echo ">>> Sync source code"
+    - git fetch origin main
+    - git reset --hard origin/main
+
+    - echo ">>> Ensure deploy script executable"
+    - chmod +x deploy.sh
+
+    - echo ">>> Start ZERO-DOWNTIME deploy"
+    - ./deploy.sh
+
+  after_script:
+    - echo ">>> Deploy job finished at $(date)"
+
+  timeout: 20m

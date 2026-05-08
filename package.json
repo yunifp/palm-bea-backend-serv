@@ -1,0 +1,36 @@
+{
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1035.0",
+    "archiver": "^7.0.1",
+    "argon2": "^0.43.0",
+    "axios": "^1.15.0",
+    "body-parser": "^1.20.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "ejs": "^5.0.2",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^2.0.0",
+    "multer-s3": "^3.0.1",
+    "mysql2": "^3.12.0",
+    "nodemailer": "^8.0.4",
+    "nodemon": "^3.1.14",
+    "pdfkit-table": "^0.1.99",
+    "puppeteer": "^24.42.0",
+    "sequelize": "^6.37.5",
+    "uuid": "^14.0.0"
+  },
+  "name": "palma-backend-beasiswa-service",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon server.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}
