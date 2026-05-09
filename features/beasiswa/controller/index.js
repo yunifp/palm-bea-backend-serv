@@ -509,21 +509,31 @@ exports.getTransaksiBeasiswaByPaginationSeleksiAdministrasi = async (req, res) =
     const provinsi = req.query.kodeProvinsi || "";
     const kabkota = req.query.kodeKabkota || "";
 
+    const idFlow = req.query.idFlow || "all";
+    const idJalur = req.query.idJalur || "all";
+
     const baseCondition = {
       id_ref_beasiswa: idBeasiswa,
       id_verifikator: req.user.id,
-      id_flow: {
-        [Op.notIn]: [0, 1],
-      },
     };
 
-    if (provinsi) {
-      baseCondition.tinggal_kode_prov = provinsi;
+    if (idFlow !== "all") {
+      if (idFlow === "lulus") {
+        const ADMIN_LULUS_FLOWS = [6, 7, 9, 10, 11, 12, 13, 17];
+        baseCondition.id_flow = { [Op.in]: ADMIN_LULUS_FLOWS };
+      } else {
+        baseCondition.id_flow = Number(idFlow);
+      }
+    } else {
+      baseCondition.id_flow = { [Op.notIn]: [0, 1] };
     }
 
-    if (kabkota) {
-      baseCondition.tinggal_kode_kab = kabkota;
+    if (idJalur !== "all") {
+      baseCondition.id_jalur = Number(idJalur);
     }
+
+    if (provinsi) baseCondition.tinggal_kode_prov = provinsi;
+    if (kabkota) baseCondition.tinggal_kode_kab = kabkota;
 
     const whereCondition = search
       ? {
@@ -540,7 +550,11 @@ exports.getTransaksiBeasiswaByPaginationSeleksiAdministrasi = async (req, res) =
       where: whereCondition,
       limit,
       offset,
-      order: [["id_trx_beasiswa", "ASC"]],
+      // ✅ SORTING FIFO BERDASARKAN WAKTU LOCKING
+      order: [
+        ["timestamp_lock_selektor", "ASC"], 
+        ["id_trx_beasiswa", "ASC"]
+      ],
     });
 
     const mappedRows = rows.map((item) => {
@@ -2294,14 +2308,17 @@ exports.getPendaftarForAssignment = async (req, res) => {
       }
       : baseCondition;
 
-    const { count, rows } = await TrxBeasiswa.findAndCountAll({
+   const { count, rows } = await TrxBeasiswa.findAndCountAll({
       where: whereCondition,
       attributes: [
         "id_trx_beasiswa", "nama_lengkap", "nik", "kode_pendaftaran", "jalur", "id_verifikator", "verifikator_nama",
         "id_flow", "flow", "status_lulus_administrasi", "tinggal_kode_prov", "tinggal_prov", "tinggal_kode_kab",
-        "tinggal_kab_kota", "created_at", "updated_at",
+        "tinggal_kab_kota", "created_at", "updated_at", "timestamp_lock_selektor" // <--- DITAMBAHKAN DI SINI
       ],
-      limit, offset, order: [["id_trx_beasiswa", "ASC"]],
+      limit, offset, order: [
+        ["timestamp_lock_selektor", "ASC"],
+        ["id_trx_beasiswa", "ASC"]
+      ],
     });
 
     const idList = rows.map(r => r.id_trx_beasiswa);
@@ -2644,32 +2661,61 @@ exports.downloadPendaftarAssignment = async (req, res) => {
       attributes: [
         "id_trx_beasiswa", "nama_lengkap", "nik", "nkk", "no_hp", "jenis_kelamin", "tanggal_lahir", "tempat_lahir", "tahun_lulus", "kondisi_buta_warna",
         "kode_pendaftaran", "jalur", "id_verifikator", "verifikator_nama", "id_flow", "flow", "tinggal_prov", "tinggal_kab_kota", "created_at",
+        "timestamp_lock_selektor" // ✅ Wajib di-load atributnya
       ],
-      order: [["id_trx_beasiswa", "ASC"]],
+      // ✅ SORTING EXCEL SECARA FIFO
+      order: [
+        ["timestamp_lock_selektor", "ASC"],
+        ["id_trx_beasiswa", "ASC"]
+      ],
     });
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Data Pendaftar");
 
+    // ✅ Header Excel diupdate (Tanggal & Waktu diganti Waktu Kunci)
     worksheet.getRow(1).values = [
-      "No", "Tanggal", "Waktu", "Kode Peserta", "Nama Peserta", "Jalur", "NIK", "NKK", "No HP", "L/P (Jenis Kelamin)",
+      "No", "Waktu Kunci", "Kode Peserta", "Nama Peserta", "Jalur", "NIK", "NKK", "No HP", "L/P (Jenis Kelamin)",
       "Tanggal Lahir", "Tempat Lahir", "Tahun Lulus", "Buta Warna", "Status", "Nama Selektor",
     ];
 
+    // ✅ Kolom Excel diupdate
     worksheet.columns = [
-      { key: "no", width: 6 }, { key: "tanggal", width: 20 }, { key: "waktu", width: 20 }, { key: "kode_pendaftaran", width: 20 },
+      { key: "no", width: 6 }, 
+      { key: "waktu_kunci", width: 22 }, 
+      { key: "kode_pendaftaran", width: 20 },
       { key: "nama_lengkap", width: 30 }, { key: "jalur", width: 20 }, { key: "nik", width: 20 }, { key: "nkk", width: 25 },
       { key: "no_hp", width: 25 }, { key: "jenis_kelamin", width: 25 }, { key: "tanggal_lahir", width: 25 }, { key: "tempat_lahir", width: 25 },
       { key: "tahun_lulus", width: 25 }, { key: "buta_warna", width: 25 }, { key: "flow", width: 25 }, { key: "selektor", width: 25 },
     ];
 
     rows.forEach((row, index) => {
+      // ✅ Logika format Waktu Kunci 
+      let waktuKunciStr = "-";
+      if (row.timestamp_lock_selektor) {
+        const d = new Date(row.timestamp_lock_selektor);
+        const pad = (n) => String(n).padStart(2, '0');
+        waktuKunciStr = `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+      }
+
       worksheet.addRow({
-        no: index + 1, tanggal: row.created_at || "-", kode_pendaftaran: row.kode_pendaftaran || "-", nama_lengkap: row.nama_lengkap || "-",
-        nik: row.nik || "-", nkk: row.nkk || "-", no_hp: row.no_hp || "-", jenis_kelamin: row.jenis_kelamin || "-", tanggal_lahir: row.tanggal_lahir || "-",
-        tempat_lahir: row.tempat_lahir || "-", tahun_lulus: row.tahun_lulus || "-", buta_warna: row.kondisi_buta_warna || "-", jalur: row.jalur || "-",
-        prov: row.tinggal_prov || "-", kabkota: row.tinggal_kab_kota || "-", flow: row.flow || "-", selektor: row.verifikator_nama || "Belum ada",
-        tanggal_daftar: row.created_at ? new Date(row.created_at).toLocaleDateString("id-ID") : "-",
+        no: index + 1, 
+        waktu_kunci: waktuKunciStr, // ✅ Memasukkan waktu_kunci ke Excel
+        kode_pendaftaran: row.kode_pendaftaran || "-", 
+        nama_lengkap: row.nama_lengkap || "-",
+        nik: row.nik || "-", 
+        nkk: row.nkk || "-", 
+        no_hp: row.no_hp || "-", 
+        jenis_kelamin: row.jenis_kelamin || "-", 
+        tanggal_lahir: row.tanggal_lahir || "-",
+        tempat_lahir: row.tempat_lahir || "-", 
+        tahun_lulus: row.tahun_lulus || "-", 
+        buta_warna: row.kondisi_buta_warna || "-", 
+        jalur: row.jalur || "-",
+        prov: row.tinggal_prov || "-", 
+        kabkota: row.tinggal_kab_kota || "-", 
+        flow: row.flow || "-", 
+        selektor: row.verifikator_nama || "Belum ada",
       });
     });
 
