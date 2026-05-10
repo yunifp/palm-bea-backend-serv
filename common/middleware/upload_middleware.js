@@ -333,15 +333,7 @@ const serveSecureFileProxy = async (req, res) => {
 
   if (!file || !folder) return res.status(400).send("Folder dan file wajib diisi");
 
-  const authHeader = req.headers["authorization"];
-  let token = req.query.token;
-
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    token = authHeader.split(" ")[1];
-  }
-
-  if (!token) return res.status(401).send("Akses ditolak: Token otentikasi tidak ditemukan");
-
+  // === LAPIS 3: ANTI COPY-PASTE ADDRESS BAR ===
   const fetchDest = req.headers["sec-fetch-dest"];
   const fetchMode = req.headers["sec-fetch-mode"];
 
@@ -349,9 +341,12 @@ const serveSecureFileProxy = async (req, res) => {
     return res.status(403).send("Akses Ditolak: Gambar/File hanya bisa dimuat dari dalam aplikasi Palma Beasiswa.");
   }
 
-  try {
-    jwt.verify(token, process.env.JWT_SECRET);
+  // [PENTING] Lapis validasi Token (JWT) sekarang sepenuhnya di-handle 
+  // oleh auth_middleware.js yang dipasang di routes (index.js).
+  const user = req.user;
+  if (!user) return res.status(401).send("Akses ditolak: User tidak valid");
 
+  try {
     const currentStorageType = process.env.DATABASE_PENYIMPANAN || "biasa";
 
     if (currentStorageType === "s3") {
@@ -389,9 +384,7 @@ const serveSecureFileProxy = async (req, res) => {
       }
     }
   } catch (error) {
-    if (error.name === "TokenExpiredError" || error.name === "JsonWebTokenError") {
-      return res.status(401).send("Sesi tidak valid atau telah berakhir");
-    }
+    console.error("Proxy Error:", error.message);
     res.status(404).send("Gagal memuat file");
   }
 };

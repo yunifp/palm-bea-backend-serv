@@ -20,7 +20,14 @@ app.use(
     crossOriginResourcePolicy: { policy: "cross-origin" },
   })
 );
-app.use(cors());
+
+// [PENYESUAIAN 1]: Konfigurasi CORS agar menerima Custom Header X-Palma-Auth dan header Lapis 2
+app.use(cors({
+  origin: "*", // Sangat disarankan diganti spesifik ke domain frontend Anda di production
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Palma-Auth", "Sec-Fetch-Dest", "Referer"]
+}));
+
 app.use(morgan("dev"));
 app.use(bodyParser.json());
 app.use(
@@ -31,7 +38,9 @@ app.use(
 
 app.use("/uploads", express.static(process.env.FILE_URL || "E:/upload_palma"));
 
-app.get("/api/files/view", serveSecureFileProxy);
+// [PENYESUAIAN 2]: Sisipkan checkAuthorization agar membaca header X-Palma-Auth
+// dan menyiapkan req.user untuk validasi kepemilikan Lapis 4 di S3
+app.get("/api/files/view", checkAuthorization, serveSecureFileProxy);
 
 app.get(
   "/api/penetapan/external/mahasiswa-final",
