@@ -35,18 +35,18 @@ const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
 
 const storageType = process.env.DATABASE_PENYIMPANAN || "biasa";
 
-const primaryEndpoint = process.env.S3_ENDPOINT || process.env.NEO_ENDPOINT || "https://nos.wjv-1.neo.id";
-const secondaryEndpoint = process.env.S3_ENDPOINT_SECONDARY || process.env.NEO_ENDPOINT_SECONDARY || "https://nos.jkt-1.neo.id";
+const primaryEndpoint = process.env.S3_ENDPOINT ;
+const secondaryEndpoint = process.env.S3_ENDPOINT_SECONDARY ;
 
 let s3Proxy = null;
 let currentS3Client = null;
 let primaryClient = null;
 let secondaryClient = null;
-const UPLOAD_BUCKET = process.env.S3_BUCKET_NAME || "palma-upload-bucket-testing";
+const UPLOAD_BUCKET = process.env.S3_BUCKET_NAME;
 
 if (storageType === "s3") {
   const s3Config = {
-    region: process.env.S3_REGION || "ap-southeast-2",
+    region: process.env.S3_REGION ,
     credentials: {
       accessKeyId: process.env.S3_ACCESS_KEY || process.env.access_key,
       secretAccessKey: process.env.S3_SECRET_KEY || process.env.secret_key,
