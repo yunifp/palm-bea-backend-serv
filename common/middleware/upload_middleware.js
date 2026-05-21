@@ -12,21 +12,29 @@ const storageType = process.env.DATABASE_PENYIMPANAN || "biasa";
 
 const APP_NAMESPACE = "1b671a64-40d5-491e-99b0-da01ff1f3341";
 
-const UPLOAD_BUCKET = process.env.S3_BUCKET_NAME || "palma-upload-bucket-testing";
+const UPLOAD_BUCKET = process.env.S3_BUCKET_NAME ;
 
 let s3Client = null;
 
 if (storageType === "s3") {
   s3Client = new S3Client({
-    region: process.env.S3_REGION || "ap-southeast-2",
+    region: process.env.S3_REGION ,
+    endpoint: process.env.S3_ENDPOINT || undefined,
     credentials: {
-      accessKeyId: process.env.S3_ACCESS_KEY,
-      secretAccessKey: process.env.S3_SECRET_KEY,
+      accessKeyId: process.env.S3_ACCESS_KEY || process.env.access_key,
+      secretAccessKey: process.env.S3_SECRET_KEY || process.env.secret_key,
     },
     forcePathStyle: true,
+    tls: true,
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
+    requestHandler: new (require("@aws-sdk/node-http-handler").NodeHttpHandler)({
+      httpsAgent: new (require("https").Agent)({
+        rejectUnauthorized: false
+      })
+    }), 
   });
 }
-
 const ensureDirectoryExists = (dirPath) => {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });

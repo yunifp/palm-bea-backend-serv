@@ -36,7 +36,7 @@ const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
 const storageType = process.env.DATABASE_PENYIMPANAN || "biasa";
 
 const primaryEndpoint = process.env.S3_ENDPOINT ;
-const secondaryEndpoint = process.env.S3_ENDPOINT_SECONDARY ;
+const secondaryEndpoint = process.env.S3_ENDPOINT_SECONDARY || process.env.S3_ENDPOINT;
 
 let s3Proxy = null;
 let currentS3Client = null;
@@ -52,6 +52,14 @@ if (storageType === "s3") {
       secretAccessKey: process.env.S3_SECRET_KEY || process.env.secret_key,
     },
     forcePathStyle: true,
+    tls: true,
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
+    requestHandler: new (require("@aws-sdk/node-http-handler").NodeHttpHandler)({
+      httpsAgent: new (require("https").Agent)({
+        rejectUnauthorized: false
+      })
+    }), 
   };
 
   primaryClient = new S3Client({ ...s3Config, endpoint: primaryEndpoint });
@@ -1315,7 +1323,7 @@ exports.updateFlowBeasiswa = async (req, res) => {
 
     return successResponse(res, "Berhasil melakukan verifikasi");
   } catch (error) {
-    return errorResponse("Internal Server Error");
+    return errorResponse(res, "Internal Server Error");
   }
 };
 
@@ -1330,7 +1338,7 @@ exports.updateTaggingBeasiswa = async (req, res) => {
 
     return successResponse(res, "Berhasil melakukan perubahan data");
   } catch (error) {
-    return errorResponse("Internal Server Error");
+    return errorResponse(res, "Internal Server Error");
   }
 };
 
@@ -3700,5 +3708,120 @@ exports.checkNikDuplikat = async (req, res) => {
     });
   } catch (error) {
     return errorResponse(res, "Internal Server Error");
+  }
+};
+
+exports.downloadPdfBuktiPendaftaran = async (req, res) => {
+  try {
+    const { idTrxBeasiswa } = req.params;
+
+    // Cari data beasiswa
+    const beasiswa = await TrxBeasiswa.findOne({
+      where: { id_trx_beasiswa: idTrxBeasiswa }
+    });
+
+    if (!beasiswa) {
+      return errorResponse(res, "Data pendaftar tidak ditemukan", 404);
+    }
+
+    // Inisialisasi PDF
+    const doc = new PDFDocument({ 
+      margins: { top: 50, bottom: 50, left: 50, right: 50 }, 
+      size: 'A4' 
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="Bukti_Pendaftaran_${beasiswa.kode_pendaftaran || idTrxBeasiswa}.pdf"`
+    );
+
+    doc.pipe(res);
+
+    // Tambahkan Logo
+    const logoPath = path.join(__dirname, '../../../assets/Ditjenbun.png');
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, 50, 40, { width: 120 });
+    } else {
+      doc.rect(50, 40, 120, 50).dash(5, {space: 5}).stroke(); 
+      doc.undash();
+    }
+
+    // Header / Kop Surat
+    doc.font('Helvetica-Bold').fontSize(11)
+       .text("BEASISWA PENGEMBANGAN SUMBER DAYA MANUSIA", 180, 45, { align: 'center', width: 365 })
+       .text("PERKEBUNAN KELAPA SAWIT", { align: 'center', width: 365 })
+       .text("2026", { align: 'center', width: 365 });
+
+    doc.moveDown(2);
+
+    // Judul Dokumen
+    doc.font('Helvetica-Bold').fontSize(12)
+       .text("TANDA BUKTI PENDAFTARAN", 50, doc.y, { align: 'center', width: 495 });
+    
+    doc.moveDown(1.5);
+
+    // Setup Kolom Data Diri
+    doc.fontSize(9);
+    const startX1 = 50;
+    const col1LabelW = 100;
+    const col1ValX = startX1 + col1LabelW + 10;
+    const col1ValW = 140;
+
+    const startX2 = 310;
+    const col2LabelW = 90;
+    const col2ValX = startX2 + col2LabelW + 10;
+    const col2ValW = 135;
+
+    const printRow2Col = (label1, val1, label2, val2) => {
+      const y = doc.y;
+      const textVal1 = val1 || '-';
+      const textVal2 = val2 || '-';
+      
+      const h1 = Math.max(doc.heightOfString(label1, {width: col1LabelW}), doc.heightOfString(textVal1, {width: col1ValW}));
+      const h2 = label2 ? Math.max(doc.heightOfString(label2, {width: col2LabelW}), doc.heightOfString(textVal2, {width: col2ValW})) : 0;
+      const maxH = Math.max(h1, h2);
+
+      doc.font('Helvetica-Bold').text(label1, startX1, y, { width: col1LabelW, align: 'left' });
+      doc.font('Helvetica-Bold').text(':', startX1 + col1LabelW, y, { width: 10, align: 'center' });
+      doc.font('Helvetica').text(textVal1, col1ValX, y, { width: col1ValW, align: 'left' });
+
+      if (label2) {
+        doc.font('Helvetica-Bold').text(label2, startX2, y, { width: col2LabelW, align: 'left' });
+        doc.font('Helvetica-Bold').text(':', startX2 + col2LabelW, y, { width: 10, align: 'center' });
+        doc.font('Helvetica').text(textVal2, col2ValX, y, { width: col2ValW, align: 'left' });
+      }
+
+      doc.y = y + maxH + 5; 
+    };
+
+    // Cetak Data Diri
+    printRow2Col("Kode Pendaftar", beasiswa.kode_pendaftaran, "Nama Ayah", beasiswa.ayah_nama);
+    printRow2Col("Nama Pendaftar", beasiswa.nama_lengkap, "No. Telepon Ayah", beasiswa.ayah_no_hp);
+    printRow2Col("NIK", beasiswa.nik, "Nama Ibu", beasiswa.ibu_nama);
+    printRow2Col("Periode", beasiswa.nama_beasiswa, "No. Telepon Ibu", beasiswa.ibu_no_hp);
+    printRow2Col("Kategori Pendaftaran", beasiswa.jalur, null, null);
+    printRow2Col("Nomor Telepon", beasiswa.no_hp, null, null);
+    printRow2Col("Alamat KTP", beasiswa.tinggal_alamat, null, null);
+    printRow2Col("Alamat Kerja / Kebun", beasiswa.kerja_alamat, null, null);
+
+    doc.moveDown(1.5);
+    doc.x = 50;
+
+    // Footer
+    const dateStr = new Date().toLocaleDateString('id-ID', { 
+      day: 'numeric', month: 'long', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+    
+    doc.font('Helvetica-Oblique').fontSize(8)
+       .text(`Bukti pendaftaran ini diunduh secara otomatis dari sistem pada: ${dateStr} WIB. Simpan bukti ini dengan baik sebagai tanda bahwa Anda telah berpartisipasi dalam pendaftaran beasiswa.`, 50, doc.y, { align: "justify", width: 495 });
+
+    doc.end();
+  } catch (error) {
+    console.error("Error Generate PDF Bukti:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: "Gagal menghasilkan PDF Bukti Pendaftaran" });
+    }
   }
 };
