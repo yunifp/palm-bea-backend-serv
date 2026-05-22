@@ -42,24 +42,20 @@ let s3Proxy = null;
 let currentS3Client = null;
 let primaryClient = null;
 let secondaryClient = null;
+
+// [PERBAIKAN 1]: Pisahkan Upload dan Download Bucket
 const UPLOAD_BUCKET = process.env.S3_BUCKET_NAME;
+const DOWNLOAD_BUCKET = process.env.S3_DOWNLOAD_BUCKET_NAME || UPLOAD_BUCKET;
 
 if (storageType === "s3") {
+  // [PERBAIKAN 2]: Sederhanakan config khusus Biznet (S3-Compatible)
   const s3Config = {
-    region: process.env.S3_REGION ,
+    region: process.env.S3_REGION || "wjv-1",
     credentials: {
       accessKeyId: process.env.S3_ACCESS_KEY || process.env.access_key,
       secretAccessKey: process.env.S3_SECRET_KEY || process.env.secret_key,
     },
     forcePathStyle: true,
-    tls: true,
-    requestChecksumCalculation: "WHEN_REQUIRED",
-    responseChecksumValidation: "WHEN_REQUIRED",
-    requestHandler: new (require("@aws-sdk/node-http-handler").NodeHttpHandler)({
-      httpsAgent: new (require("https").Agent)({
-        rejectUnauthorized: false
-      })
-    }), 
   };
 
   primaryClient = new S3Client({ ...s3Config, endpoint: primaryEndpoint });
@@ -132,7 +128,8 @@ const addFileToArchive = async (archive, folderKey, filename, archivePath) => {
               }
           } else {
               const pathParts = urlObj.pathname.split('/').filter(Boolean);
-              if (pathParts[0] === UPLOAD_BUCKET) {
+              // Cek juga jika path memiliki nama download bucket
+              if (pathParts[0] === UPLOAD_BUCKET || pathParts[0] === DOWNLOAD_BUCKET) {
                   pathParts.shift();
               }
               key = pathParts.join('/');
@@ -142,13 +139,15 @@ const addFileToArchive = async (archive, folderKey, filename, archivePath) => {
          key = `${folder}/${filename}`;
       }
       
+      // [PERBAIKAN 3]: Gunakan DOWNLOAD_BUCKET untuk membaca/mengunduh file ZIP
       const command = new GetObjectCommand({
-        Bucket: UPLOAD_BUCKET,
+        Bucket: DOWNLOAD_BUCKET,
         Key: key,
       });
       const response = await s3Proxy.send(command); 
       archive.append(response.Body, { name: archivePath });
     } catch (error) {
+      console.error("Gagal menambahkan file ke zip:", error.message);
     }
   } else {
     const fullPath = resolveFilePath(folderKey, filename);
@@ -2321,7 +2320,7 @@ exports.getPendaftarForAssignment = async (req, res) => {
       attributes: [
         "id_trx_beasiswa", "nama_lengkap", "nik", "kode_pendaftaran", "jalur", "id_verifikator", "verifikator_nama",
         "id_flow", "flow", "status_lulus_administrasi", "tinggal_kode_prov", "tinggal_prov", "tinggal_kode_kab",
-        "tinggal_kab_kota", "created_at", "updated_at", "timestamp_lock_selektor" // <--- DITAMBAHKAN DI SINI
+        "tinggal_kab_kota", "created_at", "updated_at", "timestamp_lock_selektor"
       ],
       limit, offset, order: [
         ["timestamp_lock_selektor", "ASC"],
@@ -2669,9 +2668,8 @@ exports.downloadPendaftarAssignment = async (req, res) => {
       attributes: [
         "id_trx_beasiswa", "nama_lengkap", "nik", "nkk", "no_hp", "jenis_kelamin", "tanggal_lahir", "tempat_lahir", "tahun_lulus", "kondisi_buta_warna",
         "kode_pendaftaran", "jalur", "id_verifikator", "verifikator_nama", "id_flow", "flow", "tinggal_prov", "tinggal_kab_kota", "created_at",
-        "timestamp_lock_selektor" // ✅ Wajib di-load atributnya
+        "timestamp_lock_selektor" 
       ],
-      // ✅ SORTING EXCEL SECARA FIFO
       order: [
         ["timestamp_lock_selektor", "ASC"],
         ["id_trx_beasiswa", "ASC"]
@@ -2681,13 +2679,11 @@ exports.downloadPendaftarAssignment = async (req, res) => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Data Pendaftar");
 
-    // ✅ Header Excel diupdate (Tanggal & Waktu diganti Waktu Kunci)
     worksheet.getRow(1).values = [
       "No", "Waktu Kunci", "Kode Peserta", "Nama Peserta", "Jalur", "NIK", "NKK", "No HP", "L/P (Jenis Kelamin)",
       "Tanggal Lahir", "Tempat Lahir", "Tahun Lulus", "Buta Warna", "Status", "Nama Selektor",
     ];
 
-    // ✅ Kolom Excel diupdate
     worksheet.columns = [
       { key: "no", width: 6 }, 
       { key: "waktu_kunci", width: 22 }, 
@@ -2698,7 +2694,6 @@ exports.downloadPendaftarAssignment = async (req, res) => {
     ];
 
     rows.forEach((row, index) => {
-      // ✅ Logika format Waktu Kunci 
       let waktuKunciStr = "-";
       if (row.timestamp_lock_selektor) {
         const d = new Date(row.timestamp_lock_selektor);
@@ -2708,7 +2703,7 @@ exports.downloadPendaftarAssignment = async (req, res) => {
 
       worksheet.addRow({
         no: index + 1, 
-        waktu_kunci: waktuKunciStr, // ✅ Memasukkan waktu_kunci ke Excel
+        waktu_kunci: waktuKunciStr,
         kode_pendaftaran: row.kode_pendaftaran || "-", 
         nama_lengkap: row.nama_lengkap || "-",
         nik: row.nik || "-", 

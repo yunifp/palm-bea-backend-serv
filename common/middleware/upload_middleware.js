@@ -12,29 +12,25 @@ const storageType = process.env.DATABASE_PENYIMPANAN || "biasa";
 
 const APP_NAMESPACE = "1b671a64-40d5-491e-99b0-da01ff1f3341";
 
+// Pemisahan bucket upload dan download
 const UPLOAD_BUCKET = process.env.S3_BUCKET_NAME ;
+const DOWNLOAD_BUCKET = process.env.S3_DOWNLOAD_BUCKET_NAME || UPLOAD_BUCKET;
 
 let s3Client = null;
 
 if (storageType === "s3") {
+  // Disederhanakan untuk Biznet NOS
   s3Client = new S3Client({
-    region: process.env.S3_REGION ,
+    region: process.env.S3_REGION || "wjv-1",
     endpoint: process.env.S3_ENDPOINT || undefined,
     credentials: {
       accessKeyId: process.env.S3_ACCESS_KEY || process.env.access_key,
       secretAccessKey: process.env.S3_SECRET_KEY || process.env.secret_key,
     },
     forcePathStyle: true,
-    tls: true,
-    requestChecksumCalculation: "WHEN_REQUIRED",
-    responseChecksumValidation: "WHEN_REQUIRED",
-    requestHandler: new (require("@aws-sdk/node-http-handler").NodeHttpHandler)({
-      httpsAgent: new (require("https").Agent)({
-        rejectUnauthorized: false
-      })
-    }), 
   });
 }
+
 const ensureDirectoryExists = (dirPath) => {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
@@ -101,7 +97,7 @@ const autoDeleteOldS3File = async (req, file, folderName, newFinalPath) => {
     }
 
     if (oldFileKey && oldFileKey.includes("/") && oldFileKey !== newFinalPath) {
-      const command = new DeleteObjectCommand({ Bucket: UPLOAD_BUCKET, Key: oldFileKey });
+      const command = new DeleteObjectCommand({ Bucket: UPLOAD_BUCKET, Key: oldFileKey }); // Hapus tetap di UPLOAD_BUCKET
       await s3Client.send(command);
     }
   } catch (error) {
@@ -145,7 +141,7 @@ const createStorage = (folderName) => {
     return multerS3({
       s3: s3Client,
       bucket: UPLOAD_BUCKET,
-      contentType: multerS3.AUTO_CONTENT_TYPE,
+      contentType: (req, file, cb) => { cb(null, file.mimetype); }, // Disable AUTO_CONTENT_TYPE
       key: async (req, file, cb) => {
         try {
           const ext = path.extname(file.originalname);
@@ -221,20 +217,13 @@ const createFileFilter = (allowedTypes) => {
       const typeNames = allowedTypes
         .map((type) => {
           switch (type) {
-            case "image/jpeg":
-              return "JPG";
-            case "image/png":
-              return "PNG";
-            case "image/svg+xml":
-              return "SVG";
-            case "application/pdf":
-              return "PDF";
-            case "application/msword":
-              return "DOC";
-            case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-              return "DOCX";
-            default:
-              return type;
+            case "image/jpeg": return "JPG";
+            case "image/png": return "PNG";
+            case "image/svg+xml": return "SVG";
+            case "application/pdf": return "PDF";
+            case "application/msword": return "DOC";
+            case "application/vnd.openxmlformats-officedocument.wordprocessingml.document": return "DOCX";
+            default: return type;
           }
         })
         .join(", ");
@@ -288,7 +277,7 @@ const uploadConfigs = {
         ? multerS3({
             s3: s3Client,
             bucket: UPLOAD_BUCKET,
-            contentType: multerS3.AUTO_CONTENT_TYPE,
+            contentType: (req, file, cb) => { cb(null, file.mimetype); }, // Disable AUTO_CONTENT_TYPE
             key: async (req, file, cb) => {
               try {
                 const ext = path.extname(file.originalname);
@@ -341,7 +330,6 @@ const serveSecureFileProxy = async (req, res) => {
 
   if (!file || !folder) return res.status(400).send("Folder dan file wajib diisi");
 
-  // === LAPIS 3: ANTI COPY-PASTE ADDRESS BAR ===
   const fetchDest = req.headers["sec-fetch-dest"];
   const fetchMode = req.headers["sec-fetch-mode"];
 
@@ -349,8 +337,6 @@ const serveSecureFileProxy = async (req, res) => {
     return res.status(403).send("Akses Ditolak: Gambar/File hanya bisa dimuat dari dalam aplikasi Palma Beasiswa.");
   }
 
-  // [PENTING] Lapis validasi Token (JWT) sekarang sepenuhnya di-handle 
-  // oleh auth_middleware.js yang dipasang di routes (index.js).
   const user = req.user;
   if (!user) return res.status(401).send("Akses ditolak: User tidak valid");
 
@@ -359,14 +345,16 @@ const serveSecureFileProxy = async (req, res) => {
 
     if (currentStorageType === "s3") {
       const fileKey = file.includes("/") ? file : `${folder}/${file}`;
+      
+      // Ambil file dari DOWNLOAD BUCKET
       const command = new GetObjectCommand({
-        Bucket: UPLOAD_BUCKET,
+        Bucket: DOWNLOAD_BUCKET,
         Key: fileKey,
       });
 
       if (!s3Client) {
         s3Client = new S3Client({
-          region: process.env.S3_REGION || "ap-southeast-2",
+          region: process.env.S3_REGION || "wjv-1", // Ubah fallback jadi wjv-1
           credentials: {
             accessKeyId: process.env.S3_ACCESS_KEY,
             secretAccessKey: process.env.S3_SECRET_KEY,
