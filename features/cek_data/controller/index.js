@@ -1,18 +1,34 @@
+const crypto = require("crypto");
 const { TrxBeasiswa } = require("../../../models");
 const { Op } = require("sequelize");
 const { successResponse, errorResponse } = require("../../../common/response");
 
-// 1. Nama fungsi diubah menjadi cekDataByKeyword
+// Penyimpanan memori lokal untuk captcha
+const captchaStore = {};
+
+// Fungsi untuk men-generate Captcha baru
+exports.getCaptcha = (req, res) => {
+  const a = Math.floor(Math.random() * 10);
+  const b = Math.floor(Math.random() * 10);
+  const answer = a + b;
+
+  const captchaId = crypto.randomUUID();
+  captchaStore[captchaId] = answer;
+
+  return successResponse(res, "Captcha berhasil dimuat", {
+    captchaId,
+    question: `Berapa ${a} + ${b}?`,
+  });
+};
+
 exports.cekDataByKeyword = async (req, res) => {
   try {
-    // 2. Mengambil parameter keyword dari frontend
     const { keyword } = req.query;
 
     if (!keyword) {
       return errorResponse(res, "Parameter pencarian (NIK atau Kode Pendaftaran) tidak boleh kosong.");
     }
 
-    // 3. Mencari berdasarkan NIK ATAU Kode Pendaftaran
     const data = await TrxBeasiswa.findAll({
       where: {
         [Op.or]: [
@@ -36,11 +52,25 @@ exports.cekDataByKeyword = async (req, res) => {
 
 exports.cekStatusPublic = async (req, res) => {
   try {
-    const { keyword } = req.query;
+    const { keyword, captchaId, answer } = req.query;
 
     if (!keyword) {
-      return errorResponse(res, "Parameter pencarian tidak boleh kosong.");
+      return errorResponse(res, "Parameter pencarian tidak boleh kosong.", 400);
     }
+
+    // --- VERIFIKASI CAPTCHA LOKAL ---
+    if (!captchaId || answer === undefined) {
+      return errorResponse(res, "Silakan selesaikan hitungan captcha terlebih dahulu.", 400);
+    }
+    
+    if (!(captchaId in captchaStore) || captchaStore[captchaId] !== Number(answer)) {
+      if (captchaId in captchaStore) delete captchaStore[captchaId];
+      return errorResponse(res, "Jawaban captcha salah atau kedaluwarsa.", 400);
+    }
+    
+    // Hapus captcha setelah digunakan sekali
+    delete captchaStore[captchaId];
+    // --------------------------------
 
     const data = await TrxBeasiswa.findAll({
       where: {
@@ -67,6 +97,6 @@ exports.cekStatusPublic = async (req, res) => {
     return successResponse(res, "Status berhasil ditemukan.", data);
   } catch (error) {
     console.error("Error cekStatusPublic:", error);
-    return errorResponse(res, "Internal Server Error");
+    return errorResponse(res, "Internal Server Error", 500);
   }
 };

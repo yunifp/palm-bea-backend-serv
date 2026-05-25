@@ -48,6 +48,8 @@ app.get(
   penetapanController.getExternalMahasiswaFinal
 );
 
+app.get("/api/cek-data/captcha", cekDataController.getCaptcha);
+
 app.use(
   "/api/beasiswa/beasiswa",
   checkAuthorization,
