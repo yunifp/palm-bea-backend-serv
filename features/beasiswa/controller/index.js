@@ -3710,7 +3710,7 @@ exports.downloadPdfBuktiPendaftaran = async (req, res) => {
   try {
     const { idTrxBeasiswa } = req.params;
 
-    // Cari data beasiswa
+    // 1. Cari data beasiswa
     const beasiswa = await TrxBeasiswa.findOne({
       where: { id_trx_beasiswa: idTrxBeasiswa }
     });
@@ -3719,7 +3719,59 @@ exports.downloadPdfBuktiPendaftaran = async (req, res) => {
       return errorResponse(res, "Data pendaftar tidak ditemukan", 404);
     }
 
-    // Inisialisasi PDF
+    // 2. LOGIC MENGAMBIL FOTO UNTUK PDF (Ubah jadi Buffer)
+    let fotoBuffer = null;
+    if (beasiswa.foto) {
+      try {
+        if (storageType === "s3") {
+          await checkAndSwitchEndpoint();
+          let key = beasiswa.foto;
+          
+          if (key.startsWith("http")) {
+            try {
+              const urlObj = new URL(key);
+              if (urlObj.pathname.includes('/api/files/view')) {
+                  key = decodeURIComponent(urlObj.searchParams.get('file'));
+                  const f = decodeURIComponent(urlObj.searchParams.get('folder'));
+                  if (!key.includes("/")) key = `${f}/${key}`;
+              } else {
+                  const pathParts = urlObj.pathname.split('/').filter(Boolean);
+                  if (pathParts[0] === UPLOAD_BUCKET || pathParts[0] === DOWNLOAD_BUCKET) {
+                      pathParts.shift();
+                  }
+                  key = pathParts.join('/');
+              }
+            } catch (e) {}
+          } else if (!key.includes("/")) {
+             key = `foto/${beasiswa.foto}`;
+          }
+
+          const command = new GetObjectCommand({
+            Bucket: DOWNLOAD_BUCKET,
+            Key: key,
+          });
+          const response = await s3Proxy.send(command);
+
+          // Convert S3 stream to Buffer
+          const chunks = [];
+          for await (const chunk of response.Body) {
+            chunks.push(chunk);
+          }
+          fotoBuffer = Buffer.concat(chunks);
+        } else {
+          // Baca dari Local Storage
+          const fullPath = resolveFilePath("foto", beasiswa.foto);
+          if (fs.existsSync(fullPath)) {
+            fotoBuffer = fs.readFileSync(fullPath);
+          }
+        }
+      } catch (err) {
+        console.error("Gagal mengambil foto untuk PDF:", err.message);
+        // Tetap lanjut meskipun foto gagal dimuat
+      }
+    }
+
+    // 3. Inisialisasi PDF
     const doc = new PDFDocument({ 
       margins: { top: 50, bottom: 50, left: 50, right: 50 }, 
       size: 'A4' 
@@ -3733,7 +3785,7 @@ exports.downloadPdfBuktiPendaftaran = async (req, res) => {
 
     doc.pipe(res);
 
-    // Tambahkan Logo
+    // 4. Tambahkan Logo
     const logoPath = path.join(__dirname, '../../../assets/Ditjenbun.png');
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, 50, 40, { width: 120 });
@@ -3742,74 +3794,90 @@ exports.downloadPdfBuktiPendaftaran = async (req, res) => {
       doc.undash();
     }
 
-    // Header / Kop Surat
+    // 5. Header / Kop Surat
     doc.font('Helvetica-Bold').fontSize(11)
        .text("BEASISWA PENGEMBANGAN SUMBER DAYA MANUSIA", 180, 45, { align: 'center', width: 365 })
        .text("PERKEBUNAN KELAPA SAWIT", { align: 'center', width: 365 })
        .text("2026", { align: 'center', width: 365 });
 
+    doc.moveDown(3);
+
+    // 6. Judul Dokumen
+    doc.font('Helvetica-Bold').fontSize(16)
+       .text("BUKTI PENDAFTARAN", 50, doc.y, { align: 'center', width: 495 });
+    
+    // KODE PENDAFTARAN (BOLD & BESAR)
+    doc.moveDown(0.5);
+    doc.font('Helvetica-Bold').fontSize(20)
+       .text(beasiswa.kode_pendaftaran || "BELUM ADA KODE", { align: 'center', width: 495 });
+
     doc.moveDown(2);
 
-    // Judul Dokumen
-    doc.font('Helvetica-Bold').fontSize(12)
-       .text("TANDA BUKTI PENDAFTARAN", 50, doc.y, { align: 'center', width: 495 });
-    
-    doc.moveDown(1.5);
+    // Simpan posisi Y untuk layout kolom (Teks di Kiri, Foto di Kanan)
+    const startY = doc.y;
 
-    // Setup Kolom Data Diri
-    doc.fontSize(9);
-    const startX1 = 50;
-    const col1LabelW = 100;
-    const col1ValX = startX1 + col1LabelW + 10;
-    const col1ValW = 140;
-
-    const startX2 = 310;
-    const col2LabelW = 90;
-    const col2ValX = startX2 + col2LabelW + 10;
-    const col2ValW = 135;
-
-    const printRow2Col = (label1, val1, label2, val2) => {
-      const y = doc.y;
-      const textVal1 = val1 || '-';
-      const textVal2 = val2 || '-';
-      
-      const h1 = Math.max(doc.heightOfString(label1, {width: col1LabelW}), doc.heightOfString(textVal1, {width: col1ValW}));
-      const h2 = label2 ? Math.max(doc.heightOfString(label2, {width: col2LabelW}), doc.heightOfString(textVal2, {width: col2ValW})) : 0;
-      const maxH = Math.max(h1, h2);
-
-      doc.font('Helvetica-Bold').text(label1, startX1, y, { width: col1LabelW, align: 'left' });
-      doc.font('Helvetica-Bold').text(':', startX1 + col1LabelW, y, { width: 10, align: 'center' });
-      doc.font('Helvetica').text(textVal1, col1ValX, y, { width: col1ValW, align: 'left' });
-
-      if (label2) {
-        doc.font('Helvetica-Bold').text(label2, startX2, y, { width: col2LabelW, align: 'left' });
-        doc.font('Helvetica-Bold').text(':', startX2 + col2LabelW, y, { width: 10, align: 'center' });
-        doc.font('Helvetica').text(textVal2, col2ValX, y, { width: col2ValW, align: 'left' });
+    // 7. Cetak Foto Profile (Sebelah Kanan)
+    if (fotoBuffer) {
+      try {
+        // Posisi: X = 435 (Mepet kanan), Lebar = 110
+        doc.image(fotoBuffer, 435, startY, { width: 110 });
+      } catch (e) {
+        doc.rect(435, startY, 110, 140).stroke();
+        doc.fontSize(10).text("Foto Error", 435, startY + 65, { width: 110, align: 'center' });
       }
+    } else {
+      // Placeholder jika user tidak punya foto
+      doc.rect(435, startY, 110, 140).stroke();
+      doc.font('Helvetica').fontSize(10).text("Pas Foto", 435, startY + 65, { width: 110, align: 'center' });
+    }
 
-      doc.y = y + maxH + 5; 
+    // Kembalikan Y ke posisi awal untuk mencetak tabel data di kiri
+    doc.y = startY;
+
+    // 8. Cetak Data Diri (Sebelah Kiri)
+    doc.fontSize(10);
+    const startX1 = 50;
+    const col1LabelW = 120;
+    const col1ValX = startX1 + col1LabelW + 10;
+    const col1ValW = 240; // Dibatasi agar teks tidak menabrak foto
+
+    const printRow = (label, val) => {
+      const y = doc.y;
+      const textVal = val || '-';
+      const h1 = Math.max(doc.heightOfString(label, {width: col1LabelW}), doc.heightOfString(textVal, {width: col1ValW}));
+
+      doc.font('Helvetica-Bold').text(label, startX1, y, { width: col1LabelW, align: 'left' });
+      doc.font('Helvetica-Bold').text(':', startX1 + col1LabelW, y, { width: 10, align: 'center' });
+      doc.font('Helvetica').text(textVal, col1ValX, y, { width: col1ValW, align: 'left' });
+
+      doc.y = y + h1 + 8; // Spacing antar baris
     };
 
-    // Cetak Data Diri
-    printRow2Col("Kode Pendaftar", beasiswa.kode_pendaftaran, "Nama Ayah", beasiswa.ayah_nama);
-    printRow2Col("Nama Pendaftar", beasiswa.nama_lengkap, "No. Telepon Ayah", beasiswa.ayah_no_hp);
-    printRow2Col("NIK", beasiswa.nik, "Nama Ibu", beasiswa.ibu_nama);
-    printRow2Col("Periode", beasiswa.nama_beasiswa, "No. Telepon Ibu", beasiswa.ibu_no_hp);
-    printRow2Col("Kategori Pendaftaran", beasiswa.jalur, null, null);
-    printRow2Col("Nomor Telepon", beasiswa.no_hp, null, null);
-    printRow2Col("Alamat KTP", beasiswa.tinggal_alamat, null, null);
-    printRow2Col("Alamat Kerja / Kebun", beasiswa.kerja_alamat, null, null);
+    printRow("Nama Lengkap", beasiswa.nama_lengkap);
+    printRow("NIK", beasiswa.nik);
+    printRow("Jenis Kelamin", beasiswa.jenis_kelamin);
+    printRow("Tempat, Tgl Lahir", `${beasiswa.tempat_lahir || '-'}, ${beasiswa.tanggal_lahir || '-'}`);
+    printRow("Jalur Pendaftaran", beasiswa.jalur); // JALUR
+    printRow("Nomor Handphone", beasiswa.no_hp);
+    printRow("Email", beasiswa.email);
+    printRow("Alamat KTP", beasiswa.tinggal_alamat);
 
-    doc.moveDown(1.5);
+    // Pastikan posisi Y berada di bawah foto sebelum lanjut mencetak Footer
+    const minNextY = startY + 160; 
+    if (doc.y < minNextY) {
+        doc.y = minNextY;
+    }
+
+    doc.moveDown(2);
     doc.x = 50;
 
-    // Footer
+    // 9. Footer
     const dateStr = new Date().toLocaleDateString('id-ID', { 
       day: 'numeric', month: 'long', year: 'numeric',
       hour: '2-digit', minute: '2-digit'
     });
     
-    doc.font('Helvetica-Oblique').fontSize(8)
+    doc.font('Helvetica-Oblique').fontSize(9)
        .text(`Bukti pendaftaran ini diunduh secara otomatis dari sistem pada: ${dateStr} WIB. Simpan bukti ini dengan baik sebagai tanda bahwa Anda telah berpartisipasi dalam pendaftaran beasiswa.`, 50, doc.y, { align: "justify", width: 495 });
 
     doc.end();

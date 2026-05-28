@@ -58,19 +58,22 @@ exports.cekStatusPublic = async (req, res) => {
       return errorResponse(res, "Parameter pencarian tidak boleh kosong.", 400);
     }
 
-    // --- VERIFIKASI CAPTCHA LOKAL ---
     if (!captchaId || answer === undefined) {
-      return errorResponse(res, "Silakan selesaikan hitungan captcha terlebih dahulu.", 400);
+      return res.status(200).json({ 
+        success: false, 
+        message: "Silakan selesaikan hitungan captcha terlebih dahulu." 
+      });
     }
     
     if (!(captchaId in captchaStore) || captchaStore[captchaId] !== Number(answer)) {
       if (captchaId in captchaStore) delete captchaStore[captchaId];
-      return errorResponse(res, "Jawaban captcha salah atau kedaluwarsa.", 400);
+      return res.status(200).json({
+        success: false,
+        message: "Jawaban captcha salah atau kedaluwarsa."
+      });
     }
     
-    // Hapus captcha setelah digunakan sekali
     delete captchaStore[captchaId];
-    // --------------------------------
 
     const data = await TrxBeasiswa.findAll({
       where: {
@@ -84,6 +87,7 @@ exports.cekStatusPublic = async (req, res) => {
         "nama_beasiswa", 
         "id_flow", 
         "nama_kluster", 
+        "jalur",    // <--- MENGGUNAKAN FIELD "jalur" (String)
         "pt_final", 
         "prodi_final"
       ],
