@@ -66,7 +66,7 @@ exports.downloadExcelWawancara = async (req, res) => {
 
     // Header tabel (Baris 3)
     worksheet.getRow(3).values = [
-      "No", "Nama Lengkap", "NIK", "Kode Pendaftaran", "Jalur", "Status Kluster", "Status Wawancara"
+      "No", "Nama Lengkap", "NIK", "Kode Pendaftaran", "Jalur", "Status Kluster", "Status Wawancara dan Seleksi"
     ];
 
     worksheet.columns = [

@@ -35,7 +35,7 @@ const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
 
 const storageType = process.env.DATABASE_PENYIMPANAN || "biasa";
 
-const primaryEndpoint = process.env.S3_ENDPOINT ;
+const primaryEndpoint = process.env.S3_ENDPOINT;
 const secondaryEndpoint = process.env.S3_ENDPOINT_SECONDARY || process.env.S3_ENDPOINT;
 
 let s3Proxy = null;
@@ -76,9 +76,9 @@ if (storageType === "s3") {
 let lastEndpointCheck = 0;
 const checkAndSwitchEndpoint = async () => {
   if (storageType !== "s3") return;
-  
+
   const now = Date.now();
-  if (now - lastEndpointCheck < 30000) return; 
+  if (now - lastEndpointCheck < 30000) return;
 
   try {
     await axios.get(primaryEndpoint, { timeout: 3000 });
@@ -116,35 +116,35 @@ const addFileToArchive = async (archive, folderKey, filename, archivePath) => {
 
       const folder = FOLDER_MAP[folderKey] ?? folderKey;
       let key = filename;
-      
+
       if (key.startsWith("http")) {
         try {
           const urlObj = new URL(key);
           if (urlObj.pathname.includes('/api/files/view')) {
-              key = decodeURIComponent(urlObj.searchParams.get('file'));
-              const f = decodeURIComponent(urlObj.searchParams.get('folder'));
-              if (!key.includes("/")) {
-                  key = `${f}/${key}`;
-              }
+            key = decodeURIComponent(urlObj.searchParams.get('file'));
+            const f = decodeURIComponent(urlObj.searchParams.get('folder'));
+            if (!key.includes("/")) {
+              key = `${f}/${key}`;
+            }
           } else {
-              const pathParts = urlObj.pathname.split('/').filter(Boolean);
-              // Cek juga jika path memiliki nama download bucket
-              if (pathParts[0] === UPLOAD_BUCKET || pathParts[0] === DOWNLOAD_BUCKET) {
-                  pathParts.shift();
-              }
-              key = pathParts.join('/');
+            const pathParts = urlObj.pathname.split('/').filter(Boolean);
+            // Cek juga jika path memiliki nama download bucket
+            if (pathParts[0] === UPLOAD_BUCKET || pathParts[0] === DOWNLOAD_BUCKET) {
+              pathParts.shift();
+            }
+            key = pathParts.join('/');
           }
-        } catch (e) {}
+        } catch (e) { }
       } else if (!key.includes("/")) {
-         key = `${folder}/${filename}`;
+        key = `${folder}/${filename}`;
       }
-      
+
       // [PERBAIKAN 3]: Gunakan DOWNLOAD_BUCKET untuk membaca/mengunduh file ZIP
       const command = new GetObjectCommand({
         Bucket: DOWNLOAD_BUCKET,
         Key: key,
       });
-      const response = await s3Proxy.send(command); 
+      const response = await s3Proxy.send(command);
       archive.append(response.Body, { name: archivePath });
     } catch (error) {
       console.error("Gagal menambahkan file ke zip:", error.message);
@@ -182,13 +182,13 @@ const addFotoToArchive = async (archive, data, folderPrefix) => {
       const ext = path.extname(data[field]) || ".jpg";
       await addFileToArchive(
         archive,
-        field,                                  
-        data[field],                            
-        `${folderPrefix}/foto/${kodePendaftaran} - ${label}${ext}` 
+        field,
+        data[field],
+        `${folderPrefix}/foto/${kodePendaftaran} - ${label}${ext}`
       );
     }
   }
-};  
+};
 
 const addDokumenUmumToArchive = async (archive, idTrxBeasiswa, folderPrefix, mapRefUmum = {}, kodePendaftaran = "Tanpa-No") => {
   const dokList = await TrxDokumenUmum.findAll({
@@ -199,19 +199,19 @@ const addDokumenUmumToArchive = async (archive, idTrxBeasiswa, folderPrefix, map
   for (const dok of dokList) {
     if (!dok.file) continue;
     const ext = path.extname(dok.file) || ".pdf";
-    
+
     let rawName = mapRefUmum[dok.id_ref_dokumen] || dok.nama_dokumen_persyaratan;
-    
+
     if (rawName && rawName.includes('.')) {
-        rawName = rawName.split('.').slice(0, -1).join('.');
+      rawName = rawName.split('.').slice(0, -1).join('.');
     }
 
     const nameSafe = safeDocName(rawName, dok.id);
     await addFileToArchive(
       archive,
-      "persyaratan",                                         
+      "persyaratan",
       dok.file,
-      `${folderPrefix}/dokumen_umum/${kodePendaftaran} - ${nameSafe}${ext}` 
+      `${folderPrefix}/dokumen_umum/${kodePendaftaran} - ${nameSafe}${ext}`
     );
   }
 };
@@ -228,7 +228,7 @@ const addDokumenKhususToArchive = async (archive, idTrxBeasiswa, folderPrefix, m
 
     let rawName = mapRefKhusus[dok.id_ref_dokumen] || dok.nama_dokumen_persyaratan;
     if (rawName && rawName.includes('.')) {
-        rawName = rawName.split('.').slice(0, -1).join('.');
+      rawName = rawName.split('.').slice(0, -1).join('.');
     }
 
     const nameSafe = safeDocName(rawName, dok.id);
@@ -236,7 +236,7 @@ const addDokumenKhususToArchive = async (archive, idTrxBeasiswa, folderPrefix, m
       archive,
       "persyaratan",
       dok.file,
-      `${folderPrefix}/dokumen_khusus/${kodePendaftaran} - ${nameSafe}${ext}` 
+      `${folderPrefix}/dokumen_khusus/${kodePendaftaran} - ${nameSafe}${ext}`
     );
   }
 };
@@ -244,7 +244,7 @@ const addDokumenKhususToArchive = async (archive, idTrxBeasiswa, folderPrefix, m
 const addDokumenByKategori = async (archive, data, folderPrefix, kategori, mapRefUmum = {}, mapRefKhusus = {}) => {
   const k = kategori || "all";
   const kodePendaftaran = data.kode_pendaftaran || "Tanpa-No";
-  
+
   if (k === "all" || k === "dokumen_umum") {
     await addHasilSeleksiPdfToArchive(archive, data, folderPrefix, mapRefUmum, mapRefKhusus);
   }
@@ -330,7 +330,7 @@ exports.getRekapLulusAdministrasi = async (req, res) => {
         ],
         [
           sequelize.literal(`SUM(CASE WHEN kerja_kode_kab = tinggal_kode_kab AND id_flow = 13 THEN 1 ELSE 0 END)`),
-          "jml_bekerja" 
+          "jml_bekerja"
         ]
       ],
       group: ["tinggal_kode_kab", "tinggal_prov", "tinggal_kab_kota"],
@@ -559,7 +559,7 @@ exports.getTransaksiBeasiswaByPaginationSeleksiAdministrasi = async (req, res) =
       offset,
       // ✅ SORTING FIFO BERDASARKAN WAKTU LOCKING
       order: [
-        ["timestamp_lock_selektor", "ASC"], 
+        ["timestamp_lock_selektor", "ASC"],
         ["id_trx_beasiswa", "ASC"]
       ],
     });
@@ -597,7 +597,7 @@ exports.getTransaksiBeasiswaByPaginationSeleksiAdministrasiDaerah = async (req, 
     const provinsi = req.query.kodeProvinsi || "";
     const kabkota = req.query.kodeKabkota || "";
     const dinas = req.query.Dinas || "";
-    
+
     const idFlow = req.query.idFlow || "all";
     const idJalur = req.query.idJalur || "all";
 
@@ -1624,7 +1624,7 @@ exports.getTransaksiBeasiswaByWilayah = async (req, res) => {
 
     const whereCondition = {
       beasiswa_id: beasiswaId,
-      status_aktif: true, 
+      status_aktif: true,
     };
 
     const userWhere = {};
@@ -2020,7 +2020,7 @@ exports.getCatatanVerifikasi = async (req, res) => {
 exports.updateTagDinasKabkota = async (req, res) => {
   try {
     const { idTrxBeasiswa } = req.params;
-    const { tag } = req.body; 
+    const { tag } = req.body;
 
     if (!tag || !["Y", "N"].includes(tag)) return failResponse(res, "Nilai tag tidak valid");
 
@@ -2278,7 +2278,7 @@ exports.getPendaftarForAssignment = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
     const search = req.query.search || "";
-    const filter = req.query.filter || "all"; 
+    const filter = req.query.filter || "all";
     const id_verifikator = req.query.id_verifikator || null;
     const status_filter = req.query.status_filter || "all";
 
@@ -2315,7 +2315,7 @@ exports.getPendaftarForAssignment = async (req, res) => {
       }
       : baseCondition;
 
-   const { count, rows } = await TrxBeasiswa.findAndCountAll({
+    const { count, rows } = await TrxBeasiswa.findAndCountAll({
       where: whereCondition,
       attributes: [
         "id_trx_beasiswa", "nama_lengkap", "nik", "kode_pendaftaran", "jalur", "id_verifikator", "verifikator_nama",
@@ -2668,7 +2668,7 @@ exports.downloadPendaftarAssignment = async (req, res) => {
       attributes: [
         "id_trx_beasiswa", "nama_lengkap", "nik", "nkk", "no_hp", "jenis_kelamin", "tanggal_lahir", "tempat_lahir", "tahun_lulus", "kondisi_buta_warna",
         "kode_pendaftaran", "jalur", "id_verifikator", "verifikator_nama", "id_flow", "flow", "tinggal_prov", "tinggal_kab_kota", "created_at",
-        "timestamp_lock_selektor" 
+        "timestamp_lock_selektor"
       ],
       order: [
         ["timestamp_lock_selektor", "ASC"],
@@ -2685,8 +2685,8 @@ exports.downloadPendaftarAssignment = async (req, res) => {
     ];
 
     worksheet.columns = [
-      { key: "no", width: 6 }, 
-      { key: "waktu_kunci", width: 22 }, 
+      { key: "no", width: 6 },
+      { key: "waktu_kunci", width: 22 },
       { key: "kode_pendaftaran", width: 20 },
       { key: "nama_lengkap", width: 30 }, { key: "jalur", width: 20 }, { key: "nik", width: 20 }, { key: "nkk", width: 25 },
       { key: "no_hp", width: 25 }, { key: "jenis_kelamin", width: 25 }, { key: "tanggal_lahir", width: 25 }, { key: "tempat_lahir", width: 25 },
@@ -2702,22 +2702,22 @@ exports.downloadPendaftarAssignment = async (req, res) => {
       }
 
       worksheet.addRow({
-        no: index + 1, 
+        no: index + 1,
         waktu_kunci: waktuKunciStr,
-        kode_pendaftaran: row.kode_pendaftaran || "-", 
+        kode_pendaftaran: row.kode_pendaftaran || "-",
         nama_lengkap: row.nama_lengkap || "-",
-        nik: row.nik || "-", 
-        nkk: row.nkk || "-", 
-        no_hp: row.no_hp || "-", 
-        jenis_kelamin: row.jenis_kelamin || "-", 
+        nik: row.nik || "-",
+        nkk: row.nkk || "-",
+        no_hp: row.no_hp || "-",
+        jenis_kelamin: row.jenis_kelamin || "-",
         tanggal_lahir: row.tanggal_lahir || "-",
-        tempat_lahir: row.tempat_lahir || "-", 
-        tahun_lulus: row.tahun_lulus || "-", 
-        buta_warna: row.kondisi_buta_warna || "-", 
+        tempat_lahir: row.tempat_lahir || "-",
+        tahun_lulus: row.tahun_lulus || "-",
+        buta_warna: row.kondisi_buta_warna || "-",
         jalur: row.jalur || "-",
-        prov: row.tinggal_prov || "-", 
-        kabkota: row.tinggal_kab_kota || "-", 
-        flow: row.flow || "-", 
+        prov: row.tinggal_prov || "-",
+        kabkota: row.tinggal_kab_kota || "-",
+        flow: row.flow || "-",
         selektor: row.verifikator_nama || "Belum ada",
       });
     });
@@ -2958,7 +2958,7 @@ exports.downloadVerifikasiProvinsi = async (req, res) => {
   try {
     const {
       idBeasiswa, kodeProvinsi, kodeKabkota, search = "", idFlow, idJalur, statusLulus, refDokumenUmum = [], refDokumenKhusus = [],
-    } = req.body; 
+    } = req.body;
 
     const whereCondition = buildVerifikasiDaerahWhere({
       idBeasiswa, kodeProvinsi, kodeKabkota, dinas: "provinsi", search, idFlow, idJalur, statusLulus,
@@ -3285,7 +3285,7 @@ exports.downloadPendaftarZip = async (req, res) => {
 
     const [refUmum] = await sequelizeMaster.query("SELECT id, nama_file_unduh FROM ref_syarat_umum_beasiswa");
     const [refKhusus] = await sequelizeMaster.query("SELECT id, nama_file_unduh FROM ref_syarat_khusus_beasiswa");
-    
+
     const mapRefUmum = refUmum.reduce((acc, curr) => { acc[curr.id] = curr.nama_file_unduh; return acc; }, {});
     const mapRefKhusus = refKhusus.reduce((acc, curr) => { acc[curr.id] = curr.nama_file_unduh; return acc; }, {});
 
@@ -3294,9 +3294,9 @@ exports.downloadPendaftarZip = async (req, res) => {
     const zipFilename = `dokumen_${folderName}_${kategori}.zip`;
 
     const archive = createZipResponse(res, zipFilename);
-    
-    await addDokumenByKategori(archive, data, folderName, kategori, mapRefUmum, mapRefKhusus); 
-    
+
+    await addDokumenByKategori(archive, data, folderName, kategori, mapRefUmum, mapRefKhusus);
+
     await archive.finalize();
   } catch (error) {
     if (!res.headersSent) {
@@ -3324,7 +3324,7 @@ exports.downloadBulkZip = async (req, res) => {
 
     const [refUmum] = await sequelizeMaster.query("SELECT id, nama_file_unduh FROM ref_syarat_umum_beasiswa");
     const [refKhusus] = await sequelizeMaster.query("SELECT id, nama_file_unduh FROM ref_syarat_khusus_beasiswa");
-    
+
     const mapRefUmum = refUmum.reduce((acc, curr) => { acc[curr.id] = curr.nama_file_unduh; return acc; }, {});
     const mapRefKhusus = refKhusus.reduce((acc, curr) => { acc[curr.id] = curr.nama_file_unduh; return acc; }, {});
 
@@ -3338,7 +3338,7 @@ exports.downloadBulkZip = async (req, res) => {
     for (const trx of rows) {
       const data = trx.toJSON();
       const folderPrefix = safeFolderName(data);
-      await addDokumenByKategori(archive, data, folderPrefix, kategori, mapRefUmum, mapRefKhusus); 
+      await addDokumenByKategori(archive, data, folderPrefix, kategori, mapRefUmum, mapRefKhusus);
     }
 
     await archive.finalize();
@@ -3422,9 +3422,9 @@ exports.downloadPdfHasilVerifikasi = async (req, res) => {
     const mapRefUmum = refUmum.reduce((acc, curr) => { acc[curr.id] = curr.nama_file_unduh; return acc; }, {});
     const mapRefKhusus = refKhusus.reduce((acc, curr) => { acc[curr.id] = curr.nama_file_unduh; return acc; }, {});
 
-    const doc = new PDFDocument({ 
-      margins: { top: 50, bottom: 50, left: 50, right: 50 }, 
-      size: 'A4' 
+    const doc = new PDFDocument({
+      margins: { top: 50, bottom: 50, left: 50, right: 50 },
+      size: 'A4'
     });
 
     res.setHeader("Content-Type", "application/pdf");
@@ -3436,24 +3436,24 @@ exports.downloadPdfHasilVerifikasi = async (req, res) => {
     doc.pipe(res);
 
     const logoPath = path.join(__dirname, '../../../assets/Ditjenbun.png');
-    
+
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, 50, 40, { width: 120 });
     } else {
-      doc.rect(50, 40, 120, 50).dash(5, {space: 5}).stroke(); 
+      doc.rect(50, 40, 120, 50).dash(5, { space: 5 }).stroke();
       doc.undash();
     }
 
     doc.font('Helvetica-Bold').fontSize(11)
-       .text("BEASISWA PENGEMBANGAN SUMBER DAYA MANUSIA", 180, 45, { align: 'center', width: 365 })
-       .text("PERKEBUNAN KELAPA SAWIT", { align: 'center', width: 365 })
-       .text("2026", { align: 'center', width: 365 });
+      .text("BEASISWA PENGEMBANGAN SUMBER DAYA MANUSIA", 180, 45, { align: 'center', width: 365 })
+      .text("PERKEBUNAN KELAPA SAWIT", { align: 'center', width: 365 })
+      .text("2026", { align: 'center', width: 365 });
 
     doc.moveDown(2);
 
     doc.font('Helvetica-Bold').fontSize(12)
-       .text("HASIL SELEKSI ADMINISTRASI", 50, doc.y, { align: 'center', width: 495 });
-    
+      .text("HASIL SELEKSI ADMINISTRASI", 50, doc.y, { align: 'center', width: 495 });
+
     doc.moveDown(1.5);
 
     doc.fontSize(9);
@@ -3472,9 +3472,9 @@ exports.downloadPdfHasilVerifikasi = async (req, res) => {
       const y = doc.y;
       const textVal1 = val1 || '-';
       const textVal2 = val2 || '-';
-      
-      const h1 = Math.max(doc.heightOfString(label1, {width: col1LabelW}), doc.heightOfString(textVal1, {width: col1ValW}));
-      const h2 = label2 ? Math.max(doc.heightOfString(label2, {width: col2LabelW}), doc.heightOfString(textVal2, {width: col2ValW})) : 0;
+
+      const h1 = Math.max(doc.heightOfString(label1, { width: col1LabelW }), doc.heightOfString(textVal1, { width: col1ValW }));
+      const h2 = label2 ? Math.max(doc.heightOfString(label2, { width: col2LabelW }), doc.heightOfString(textVal2, { width: col2ValW })) : 0;
       const maxH = Math.max(h1, h2);
 
       doc.font('Helvetica-Bold').text(label1, startX1, y, { width: col1LabelW, align: 'left' });
@@ -3487,7 +3487,7 @@ exports.downloadPdfHasilVerifikasi = async (req, res) => {
         doc.font('Helvetica').text(textVal2, col2ValX, y, { width: col2ValW, align: 'left' });
       }
 
-      doc.y = y + maxH + 5; 
+      doc.y = y + maxH + 5;
     };
 
     printRow2Col("Kode Pendaftar", beasiswa.kode_pendaftaran, "Nama Ayah", beasiswa.ayah_nama);
@@ -3500,7 +3500,7 @@ exports.downloadPdfHasilVerifikasi = async (req, res) => {
     printRow2Col("Alamat Kerja / Kebun", beasiswa.kerja_alamat, null, null);
 
     doc.moveDown(1.5);
-    doc.x = 50; 
+    doc.x = 50;
 
     const tableData = [];
     let no = 1;
@@ -3508,11 +3508,11 @@ exports.downloadPdfHasilVerifikasi = async (req, res) => {
     const processDokumen = (dokList, isKhusus = false) => {
       dokList.forEach(dok => {
         let status = dok.status_verifikasi || "Belum Diverifikasi";
-        
+
         let namaFileRef = isKhusus ? mapRefKhusus[dok.id_ref_dokumen] : mapRefUmum[dok.id_ref_dokumen];
-        
+
         let namaFileAsli = dok.file ? String(dok.file).split('/').pop() : "-";
-        let ekstensiAsli = dok.file ? path.extname(dok.file) : ""; 
+        let ekstensiAsli = dok.file ? path.extname(dok.file) : "";
 
         let namaFinal = "-";
 
@@ -3525,7 +3525,7 @@ exports.downloadPdfHasilVerifikasi = async (req, res) => {
         } else {
           namaFinal = namaFileAsli;
         }
-        
+
         tableData.push([
           String(no++),
           dok.nama_dokumen_persyaratan || "-",
@@ -3549,8 +3549,8 @@ exports.downloadPdfHasilVerifikasi = async (req, res) => {
     };
 
     await doc.table(table, {
-      x: 50, 
-      width: 495, 
+      x: 50,
+      width: 495,
       prepareHeader: () => doc.font("Helvetica-Bold").fontSize(9),
       prepareRow: () => doc.font("Helvetica").fontSize(8),
       padding: 5,
@@ -3561,14 +3561,14 @@ exports.downloadPdfHasilVerifikasi = async (req, res) => {
     });
 
     doc.moveDown(2);
-    const dateStr = new Date().toLocaleDateString('id-ID', { 
+    const dateStr = new Date().toLocaleDateString('id-ID', {
       day: 'numeric', month: 'long', year: 'numeric',
       hour: '2-digit', minute: '2-digit'
     });
-    
+
     doc.x = 50;
     doc.font('Helvetica-Oblique').fontSize(8)
-       .text(`Dicetak secara otomatis dari sistem pada: ${dateStr} WIB`, 50, doc.y, { align: "left", width: 495 });
+      .text(`Dicetak secara otomatis dari sistem pada: ${dateStr} WIB`, 50, doc.y, { align: "left", width: 495 });
 
     doc.end();
   } catch (error) {
@@ -3586,9 +3586,9 @@ const addHasilSeleksiPdfToArchive = async (archive, data, folderPrefix, mapRefUm
     const dokUmum = await TrxDokumenUmum.findAll({ where: { id_trx_beasiswa } });
     const dokKhusus = await TrxDokumenKhusus.findAll({ where: { id_trx_beasiswa } });
 
-    const doc = new PDFDocument({ 
-      margins: { top: 50, bottom: 50, left: 50, right: 50 }, 
-      size: 'A4' 
+    const doc = new PDFDocument({
+      margins: { top: 50, bottom: 50, left: 50, right: 50 },
+      size: 'A4'
     });
 
     archive.append(doc, { name: `${folderPrefix}/${kodePendaftaran} - Hasil Seleksi Administrasi.pdf` });
@@ -3597,19 +3597,19 @@ const addHasilSeleksiPdfToArchive = async (archive, data, folderPrefix, mapRefUm
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, 50, 40, { width: 120 });
     } else {
-      doc.rect(50, 40, 120, 50).dash(5, {space: 5}).stroke(); 
+      doc.rect(50, 40, 120, 50).dash(5, { space: 5 }).stroke();
       doc.undash();
     }
 
     doc.font('Helvetica-Bold').fontSize(11)
-       .text("BEASISWA PENGEMBANGAN SUMBER DAYA MANUSIA", 180, 45, { align: 'center', width: 365 })
-       .text("PERKEBUNAN KELAPA SAWIT", { align: 'center', width: 365 })
-       .text("2026", { align: 'center', width: 365 });
+      .text("BEASISWA PENGEMBANGAN SUMBER DAYA MANUSIA", 180, 45, { align: 'center', width: 365 })
+      .text("PERKEBUNAN KELAPA SAWIT", { align: 'center', width: 365 })
+      .text("2026", { align: 'center', width: 365 });
 
     doc.moveDown(2);
     doc.font('Helvetica-Bold').fontSize(12)
-       .text("HASIL SELEKSI ADMINISTRASI", 50, doc.y, { align: 'center', width: 495 });
-    
+      .text("HASIL SELEKSI ADMINISTRASI", 50, doc.y, { align: 'center', width: 495 });
+
     doc.moveDown(1.5);
 
     doc.fontSize(9);
@@ -3618,8 +3618,8 @@ const addHasilSeleksiPdfToArchive = async (archive, data, folderPrefix, mapRefUm
 
     const printRow2Col = (label1, val1, label2, val2) => {
       const y = doc.y;
-      const h1 = doc.heightOfString(val1 || '-', {width: col1ValW});
-      const h2 = label2 ? doc.heightOfString(val2 || '-', {width: col2ValW}) : 0;
+      const h1 = doc.heightOfString(val1 || '-', { width: col1ValW });
+      const h2 = label2 ? doc.heightOfString(val2 || '-', { width: col2ValW }) : 0;
       const maxH = Math.max(h1, h2, 10);
 
       doc.font('Helvetica-Bold').text(label1, startX1, y, { width: 100 });
@@ -3631,7 +3631,7 @@ const addHasilSeleksiPdfToArchive = async (archive, data, folderPrefix, mapRefUm
         doc.text(':', col2ValX - 10, y, { width: 10, align: 'center' });
         doc.font('Helvetica').text(val2 || '-', col2ValX, y, { width: col2ValW });
       }
-      doc.y = y + maxH + 5; 
+      doc.y = y + maxH + 5;
     };
 
     printRow2Col("Kode Pendaftar", data.kode_pendaftaran, "Nama Ayah", data.ayah_nama);
@@ -3661,9 +3661,9 @@ const addHasilSeleksiPdfToArchive = async (archive, data, folderPrefix, mapRefUm
 
     await doc.table({
       headers: [
-        { label: "No.", property: "no", width: 25 }, 
-        { label: "Syarat", property: "s", width: 260 }, 
-        { label: "Dokumen", property: "d", width: 130 }, 
+        { label: "No.", property: "no", width: 25 },
+        { label: "Syarat", property: "s", width: 260 },
+        { label: "Dokumen", property: "d", width: 130 },
         { label: "Hasil", property: "h", width: 80 }
       ],
       rows: tableData
@@ -3726,24 +3726,24 @@ exports.downloadPdfBuktiPendaftaran = async (req, res) => {
         if (storageType === "s3") {
           await checkAndSwitchEndpoint();
           let key = beasiswa.foto;
-          
+
           if (key.startsWith("http")) {
             try {
               const urlObj = new URL(key);
               if (urlObj.pathname.includes('/api/files/view')) {
-                  key = decodeURIComponent(urlObj.searchParams.get('file'));
-                  const f = decodeURIComponent(urlObj.searchParams.get('folder'));
-                  if (!key.includes("/")) key = `${f}/${key}`;
+                key = decodeURIComponent(urlObj.searchParams.get('file'));
+                const f = decodeURIComponent(urlObj.searchParams.get('folder'));
+                if (!key.includes("/")) key = `${f}/${key}`;
               } else {
-                  const pathParts = urlObj.pathname.split('/').filter(Boolean);
-                  if (pathParts[0] === UPLOAD_BUCKET || pathParts[0] === DOWNLOAD_BUCKET) {
-                      pathParts.shift();
-                  }
-                  key = pathParts.join('/');
+                const pathParts = urlObj.pathname.split('/').filter(Boolean);
+                if (pathParts[0] === UPLOAD_BUCKET || pathParts[0] === DOWNLOAD_BUCKET) {
+                  pathParts.shift();
+                }
+                key = pathParts.join('/');
               }
-            } catch (e) {}
+            } catch (e) { }
           } else if (!key.includes("/")) {
-             key = `foto/${beasiswa.foto}`;
+            key = `foto/${beasiswa.foto}`;
           }
 
           const command = new GetObjectCommand({
@@ -3772,9 +3772,9 @@ exports.downloadPdfBuktiPendaftaran = async (req, res) => {
     }
 
     // 3. Inisialisasi PDF
-    const doc = new PDFDocument({ 
-      margins: { top: 50, bottom: 50, left: 50, right: 50 }, 
-      size: 'A4' 
+    const doc = new PDFDocument({
+      margins: { top: 50, bottom: 50, left: 50, right: 50 },
+      size: 'A4'
     });
 
     res.setHeader("Content-Type", "application/pdf");
@@ -3790,26 +3790,26 @@ exports.downloadPdfBuktiPendaftaran = async (req, res) => {
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, 50, 40, { width: 120 });
     } else {
-      doc.rect(50, 40, 120, 50).dash(5, {space: 5}).stroke(); 
+      doc.rect(50, 40, 120, 50).dash(5, { space: 5 }).stroke();
       doc.undash();
     }
 
     // 5. Header / Kop Surat
     doc.font('Helvetica-Bold').fontSize(11)
-       .text("BEASISWA PENGEMBANGAN SUMBER DAYA MANUSIA", 180, 45, { align: 'center', width: 365 })
-       .text("PERKEBUNAN KELAPA SAWIT", { align: 'center', width: 365 })
-       .text("2026", { align: 'center', width: 365 });
+      .text("BEASISWA PENGEMBANGAN SUMBER DAYA MANUSIA", 180, 45, { align: 'center', width: 365 })
+      .text("PERKEBUNAN KELAPA SAWIT", { align: 'center', width: 365 })
+      .text("2026", { align: 'center', width: 365 });
 
     doc.moveDown(3);
 
     // 6. Judul Dokumen
     doc.font('Helvetica-Bold').fontSize(16)
-       .text("BUKTI PENDAFTARAN", 50, doc.y, { align: 'center', width: 495 });
-    
+      .text("KODE PENDAFTARAN", 50, doc.y, { align: 'center', width: 495 });
+
     // KODE PENDAFTARAN (BOLD & BESAR)
     doc.moveDown(0.5);
     doc.font('Helvetica-Bold').fontSize(20)
-       .text(beasiswa.kode_pendaftaran || "BELUM ADA KODE", { align: 'center', width: 495 });
+      .text(beasiswa.kode_pendaftaran || "BELUM ADA KODE", { align: 'center', width: 495 });
 
     doc.moveDown(2);
 
@@ -3844,7 +3844,7 @@ exports.downloadPdfBuktiPendaftaran = async (req, res) => {
     const printRow = (label, val) => {
       const y = doc.y;
       const textVal = val || '-';
-      const h1 = Math.max(doc.heightOfString(label, {width: col1LabelW}), doc.heightOfString(textVal, {width: col1ValW}));
+      const h1 = Math.max(doc.heightOfString(label, { width: col1LabelW }), doc.heightOfString(textVal, { width: col1ValW }));
 
       doc.font('Helvetica-Bold').text(label, startX1, y, { width: col1LabelW, align: 'left' });
       doc.font('Helvetica-Bold').text(':', startX1 + col1LabelW, y, { width: 10, align: 'center' });
@@ -3863,22 +3863,22 @@ exports.downloadPdfBuktiPendaftaran = async (req, res) => {
     printRow("Alamat KTP", beasiswa.tinggal_alamat);
 
     // Pastikan posisi Y berada di bawah foto sebelum lanjut mencetak Footer
-    const minNextY = startY + 160; 
+    const minNextY = startY + 160;
     if (doc.y < minNextY) {
-        doc.y = minNextY;
+      doc.y = minNextY;
     }
 
     doc.moveDown(2);
     doc.x = 50;
 
     // 9. Footer
-    const dateStr = new Date().toLocaleDateString('id-ID', { 
+    const dateStr = new Date().toLocaleDateString('id-ID', {
       day: 'numeric', month: 'long', year: 'numeric',
       hour: '2-digit', minute: '2-digit'
     });
-    
+
     doc.font('Helvetica-Oblique').fontSize(9)
-       .text(`Bukti pendaftaran ini diunduh secara otomatis dari sistem pada: ${dateStr} WIB. Simpan bukti ini dengan baik sebagai tanda bahwa Anda telah berpartisipasi dalam pendaftaran beasiswa.`, 50, doc.y, { align: "justify", width: 495 });
+      .text(`Bukti pendaftaran ini diunduh secara otomatis dari sistem pada: ${dateStr} WIB. Simpan bukti ini dengan baik sebagai tanda bahwa Anda telah berpartisipasi dalam pendaftaran beasiswa.`, 50, doc.y, { align: "justify", width: 495 });
 
     doc.end();
   } catch (error) {
@@ -3886,5 +3886,61 @@ exports.downloadPdfBuktiPendaftaran = async (req, res) => {
     if (!res.headersSent) {
       res.status(500).json({ success: false, message: "Gagal menghasilkan PDF Bukti Pendaftaran" });
     }
+  }
+};
+
+exports.getCountPtAndProdi = async (req, res) => {
+  try {
+    const { id_pt, id_prodi } = req.query;
+
+    // Parse comma-separated string → array of numbers, buang NaN
+    const ptIds = id_pt
+      ? String(id_pt).split(",").map(Number).filter((n) => !isNaN(n) && n > 0)
+      : [];
+
+    const prodiIds = id_prodi
+      ? String(id_prodi).split(",").map(Number).filter((n) => !isNaN(n) && n > 0)
+      : [];
+
+    const [topPT, topProdi] = await Promise.all([
+      ptIds.length
+        ? TrxPilihanProgramStudi.findAll({
+          where: { id_pt: { [Op.in]: ptIds } },
+          attributes: [
+            "id_pt",
+            "nama_pt",
+            [fn("COUNT", col("id")), "jumlah"],
+          ],
+          group: ["id_pt", "nama_pt"],
+          order: [[literal("jumlah"), "DESC"]],
+          limit: 3,
+          raw: true,
+        })
+        : Promise.resolve([]),
+
+      prodiIds.length
+        ? TrxPilihanProgramStudi.findAll({
+          where: { id_prodi: { [Op.in]: prodiIds } },
+          attributes: [
+            "id_prodi",
+            "nama_prodi",
+            "id_pt",
+            "nama_pt",
+            [fn("COUNT", col("id")), "jumlah"],
+          ],
+          group: ["id_prodi", "nama_prodi", "id_pt", "nama_pt"],
+          order: [[literal("jumlah"), "DESC"]],
+          limit: 3,
+          raw: true,
+        })
+        : Promise.resolve([]),
+    ]);
+
+    return successResponse(res, "Data berhasil dimuat", {
+      top_pt: topPT,
+      top_prodi: topProdi,
+    });
+  } catch (error) {
+    return errorResponse(res, "Internal Server Error");
   }
 };

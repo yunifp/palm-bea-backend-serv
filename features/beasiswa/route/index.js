@@ -69,7 +69,8 @@ const {
   getKoreksiPendaftar,
   checkNikDuplikat,
   downloadPdfHasilVerifikasi,
-  downloadPdfBuktiPendaftaran
+  downloadPdfBuktiPendaftaran,
+  getCountPtAndProdi
 } = require("../controller");
 const {
   uploadConfigs,
@@ -140,6 +141,7 @@ router.get('/pilihan-prodi-form/:idTrxBeasiswa', getPilihanProgramStudiForForm);
 router.get('/download-rekap-daerah', downloadRekapBeasiswaDaerah);
 router.get('/total', getTotalTrxBeasiswa);
 router.get('/verifikator/beban', getBebanVerifikator);
+router.get("/count-pt-prodi", getCountPtAndProdi);
 router.get("/:idTrxBeasiswa/catatan-verifikasi", getCatatanVerifikasi);
 router.post("/:idTrxBeasiswa/catatan-verifikasi", saveCatatanVerifikasi);
 
@@ -198,6 +200,7 @@ router.get("/:idBeasiswa/status-verifikasi-kabkota", getStatusVerifikasiKabkota)
 router.get("/:idTrxBeasiswa/koreksi", getKoreksiPendaftar);
 router.get("/check-nik-duplikat/:nik", checkNikDuplikat);
 router.get("/download-pdf-verifikasi/:idTrxBeasiswa", downloadPdfHasilVerifikasi);
-router.get("/download-pdf-bukti-pendaftaran/:idTrxBeasiswa", downloadPdfBuktiPendaftaran); 
+router.get("/download-pdf-bukti-pendaftaran/:idTrxBeasiswa", downloadPdfBuktiPendaftaran);
+
 
 module.exports = router;
