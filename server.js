@@ -1,3 +1,6 @@
+require('dotenv').config({ path: './config.env' });
+require('@opentelemetry/auto-instrumentations-node/register');
+
 const app = require("./index");
 const { testConnection } = require("./core/db_config");
 

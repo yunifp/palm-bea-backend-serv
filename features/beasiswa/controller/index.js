@@ -867,7 +867,7 @@ exports.submitBeasiswa = async (req, res) => {
       ibu_nama, ibu_nik, ibu_jenjang_pendidikan, ibu_pekerjaan, ibu_penghasilan, ibu_status_hidup, ibu_status_kekerabatan, ibu_tempat_lahir, ibu_tanggal_lahir, ibu_no_hp, ibu_email, ibu_alamat,
       wali_nama, wali_nik, wali_jenjang_pendidikan, wali_pekerjaan, wali_penghasilan, wali_status_hidup, wali_status_kekerabatan, wali_tempat_lahir, wali_tanggal_lahir, wali_no_hp, wali_email, wali_alamat,
       sekolah_provinsi, sekolah_kabkot, jenjang_sekolah, sekolah, nisn_sekolah, jurusan, tahun_lulus, nama_jurusan_sekolah, id_verifikator,
-      kondisi_buta_warna, pilihan_program_studi, kode_dinas_provinsi, kode_dinas_kabkota, jalur,
+      kondisi_buta_warna, pilihan_program_studi, kode_dinas_provinsi, kode_dinas_kabkota, jalur, tag_daerah_terluar,
     } = req.body;
 
     const files = req.files || {};
@@ -957,7 +957,7 @@ exports.submitBeasiswa = async (req, res) => {
       sekolah: normalize(sekolah), nisn_sekolah: normalize(nisn_sekolah), jurusan: normalize(jurusan), tahun_lulus: normalize(tahun_lulus),
       nama_jurusan_sekolah: normalize(nama_jurusan_sekolah), kondisi_buta_warna: normalize(kondisi_buta_warna),
       kode_dinas_provinsi: normalize(idDinasprov), kode_dinas_kabkota: normalize(idDinaskabkota),
-      id_jalur: normalize(idJalur), jalur: normalize(namaJalur), updated_at: new Date(),
+      id_jalur: normalize(idJalur), jalur: normalize(namaJalur), updated_at: new Date(), tag_daerah_terluar: normalize(tag_daerah_terluar),
     };
 
     if (fotoFile) updateData.foto = getSafeFilename(fotoFile);
@@ -2301,7 +2301,13 @@ exports.getPendaftarForAssignment = async (req, res) => {
     }
 
     if (status_filter !== "all") {
-      baseCondition.id_flow = status_filter;
+      if (status_filter === "lulus") {
+        baseCondition.id_flow = {
+          [Op.gte]: 6
+        };
+      } else {
+        baseCondition.id_flow = Number(status_filter);
+      }
     }
 
     const whereCondition = search

@@ -298,6 +298,11 @@ const TrxBeasiswa = sequelize.define(
       allowNull: true,
       defaultValue: "0",
     },
+    tag_daerah_terluar: {
+      type: DataTypes.ENUM("1", "0"),
+      allowNull: true,
+      defaultValue: "0",
+    },
     tag_lock_selektor: {
       type: DataTypes.ENUM("1", "0"),
       allowNull: true,
@@ -353,6 +358,8 @@ const TrxBeasiswa = sequelize.define(
   {
     tableName: "trx_beasiswa",
     timestamps: false,
+    createdAt: "created_at",
+    updatedAt: "updated_at",
   }
 );
 
