@@ -15,13 +15,25 @@ const getWhereCondition = (tipe_laporan, jalur_text, search) => {
   }
 
   switch (String(tipe_laporan)) {
-    case "1": where.is_active = 1; break;
-    case "2": where.is_active = 0; break;
-    case "3": where.id_flow = 3; break;
-    case "4": where.status_lulus_administrasi = "Y"; break;
-    case "5": where.status_dari_verifikator_dinas = "Y"; break;
-    case "6": where.status_lulus_wawancara_akademik = "Y"; break;
-    case "7": where.id_flow = 14; break;
+    case "1": 
+      where.is_active = 1; 
+      break;
+    case "2": 
+      where.is_active = 0; 
+      break;
+    case "3": 
+      where.id_flow = 3; 
+      break;
+    case "4": 
+      // Mengambil semua data pendaftar yang lulus administrasi (id_flow >= 6)
+      // Termasuk verifikasi dan tes seleksi
+      where.id_flow = {
+        [Op.gte]: 6
+      }; 
+      break;
+    case "7": 
+      where.id_flow = 14; 
+      break;
   }
   return where;
 };

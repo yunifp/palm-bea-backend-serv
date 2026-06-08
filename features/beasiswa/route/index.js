@@ -70,7 +70,9 @@ const {
   checkNikDuplikat,
   downloadPdfHasilVerifikasi,
   downloadPdfBuktiPendaftaran,
-  getCountPtAndProdi
+  getCountPtAndProdi,
+  autosaveSectionVerifikasi,
+  autosaveDokumenVerifikasi,
 } = require("../controller");
 const {
   uploadConfigs,
@@ -202,5 +204,6 @@ router.get("/check-nik-duplikat/:nik", checkNikDuplikat);
 router.get("/download-pdf-verifikasi/:idTrxBeasiswa", downloadPdfHasilVerifikasi);
 router.get("/download-pdf-bukti-pendaftaran/:idTrxBeasiswa", downloadPdfBuktiPendaftaran);
 
-
+router.post("/:idTrxBeasiswa/autosave-section", autosaveSectionVerifikasi);
+router.post("/:idTrxBeasiswa/autosave-dokumen", autosaveDokumenVerifikasi);
 module.exports = router;

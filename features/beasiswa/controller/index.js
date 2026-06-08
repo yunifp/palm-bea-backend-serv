@@ -559,8 +559,8 @@ exports.getTransaksiBeasiswaByPaginationSeleksiAdministrasi = async (req, res) =
       offset,
       // ✅ SORTING FIFO BERDASARKAN WAKTU LOCKING
       order: [
-        ["timestamp_lock_selektor", "ASC"],
-        ["id_trx_beasiswa", "ASC"]
+        ["timestamp_lock_selektor", "DESC"],
+        ["id_trx_beasiswa", "DESC"]
       ],
     });
 
@@ -2329,8 +2329,8 @@ exports.getPendaftarForAssignment = async (req, res) => {
         "tinggal_kab_kota", "created_at", "updated_at", "timestamp_lock_selektor"
       ],
       limit, offset, order: [
-        ["timestamp_lock_selektor", "ASC"],
-        ["id_trx_beasiswa", "ASC"]
+        ["timestamp_lock_selektor", "DESC"],
+        ["id_trx_beasiswa", "DESC"]
       ],
     });
 
@@ -3946,6 +3946,88 @@ exports.getCountPtAndProdi = async (req, res) => {
       top_pt: topPT,
       top_prodi: topProdi,
     });
+  } catch (error) {
+    return errorResponse(res, "Internal Server Error");
+  }
+};
+exports.autosaveSectionVerifikasi = async (req, res) => {
+  try {
+    const { idTrxBeasiswa } = req.params;
+    const { field, value, catatan } = req.body;
+
+    const allowedFields = [
+      "data_pribadi_is_valid",
+      "data_tempat_tinggal_bekerja_is_valid",
+      "data_orang_tua_is_valid",
+      "data_pendidikan_is_valid",
+    ];
+
+    if (!allowedFields.includes(field)) {
+      return failResponse(res, "Field tidak diizinkan");
+    }
+
+    if (!["Y", "N"].includes(value)) {
+      return failResponse(res, "Value tidak valid");
+    }
+
+    const catatanField = field.replace("_is_valid", "_catatan");
+
+    const updatePayload = { [field]: value };
+    if (catatan !== undefined) {
+      updatePayload[catatanField] = catatan; // ✅ simpan catatan sekaligus
+    }
+
+    const existing = await TrxCatatanDataSection.findOne({
+      where: { id_trx_beasiswa: idTrxBeasiswa },
+    });
+
+    if (existing) {
+      console.log(existing);
+      await TrxCatatanDataSection.update(
+        updatePayload,
+        { where: { id_trx_beasiswa: idTrxBeasiswa } }
+      );
+    } else {
+      await TrxCatatanDataSection.create({
+        id_trx_beasiswa: idTrxBeasiswa,
+        ...updatePayload,
+        created_at: new Date(),
+        created_by: req.user?.nama ?? null,
+      });
+    }
+
+    return successResponse(res, "Autosave section berhasil");
+  } catch (error) {
+    return errorResponse(res, "Internal Server Error");
+  }
+};
+
+exports.autosaveDokumenVerifikasi = async (req, res) => {
+  try {
+    const { idTrxBeasiswa } = req.params;
+    const { fieldName, dokumenId, value, catatan } = req.body;
+
+    if (!["Y", "N"].includes(value)) {
+      return failResponse(res, "Value tidak valid");
+    }
+
+    if (!["data_persyaratan_umum", "data_persyaratan_khusus"].includes(fieldName)) {
+      return failResponse(res, "fieldName tidak valid");
+    }
+
+    const updateData = {
+      status_verifikasi: value === "Y" ? "sesuai" : "tidak sesuai",
+      verifikator_catatan: catatan ?? null,
+      verifikator_timestamp: new Date(),
+    };
+
+    if (fieldName === "data_persyaratan_umum") {
+      await TrxDokumenUmum.update(updateData, { where: { id: dokumenId } });
+    } else {
+      await TrxDokumenKhusus.update(updateData, { where: { id: dokumenId } });
+    }
+
+    return successResponse(res, "Autosave dokumen berhasil");
   } catch (error) {
     return errorResponse(res, "Internal Server Error");
   }
