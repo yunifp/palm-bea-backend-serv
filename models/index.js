@@ -18,6 +18,7 @@ const EmailLog = require("./EmailLog");
 const TrxMahasiswaFinal = require("./TrxMahasiswaFinal");
 const TrxKoreksiPendaftar = require("./TrxKoreksiPendaftar");
 const RefNikCekal = require("./RefNikCekal");
+const TrxLogKembalikanKeSelektor = require("./TrxLogKembalikanKeSelektor");
 
 // Buat object models supaya gampang akses
 const models = {
@@ -25,6 +26,7 @@ const models = {
   TrxDokumenKhusus,
   TrxDokumenUmum,
   TrxDokumenDinasDaerah,
+  TrxLogKembalikanKeSelektor,
   TrxLog,
   TrxPilihanProgramStudi,
   TrxCatatanDataSection,

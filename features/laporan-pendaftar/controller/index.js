@@ -1,6 +1,6 @@
 const { Op } = require("sequelize");
 const exceljs = require("exceljs");
-const { TrxBeasiswa, TrxPilihanProgramStudi, sequelize } = require("../../../models");
+const { TrxBeasiswa, TrxPilihanProgramStudi, TrxLogKembalikanKeSelektor, sequelize } = require("../../../models");
 const { successResponse, errorResponse } = require("../../../common/response");
 
 const getWhereCondition = (tipe_laporan, jalur_text, search) => {
@@ -49,7 +49,7 @@ exports.getLaporanPaginated = async (req, res) => {
       limit: parseInt(limit),
       offset: offset,
       order: [["id_trx_beasiswa", "DESC"]],
-      attributes: ['id_trx_beasiswa', 'kode_pendaftaran', 'nama_lengkap', 'nik', 'jalur'] 
+      attributes: ['id_trx_beasiswa', 'kode_pendaftaran', 'nama_lengkap', 'nik', 'jalur', 'id_flow']
     });
 
     return successResponse(res, "Berhasil memuat data laporan", {
@@ -258,5 +258,58 @@ exports.exportLaporanExcel = async (req, res) => {
   } catch (error) { 
     console.error("Error Export Excel:", error);
     return errorResponse(res, "Gagal export file"); 
+  }
+};
+
+
+exports.revertFlowToDua = async (req, res) => {
+  const t = await sequelize.transaction(); 
+
+  try {
+    const { id_trx_beasiswa } = req.params;
+    const { alasan } = req.body; 
+
+    const pendaftar = await TrxBeasiswa.findOne({
+      where: { id_trx_beasiswa },
+      transaction: t
+    });
+
+    if (!pendaftar) {
+      await t.rollback();
+      return errorResponse(res, "Data pendaftar tidak ditemukan.");
+    }
+
+    const idFlowSebelumnya = pendaftar.id_flow;
+
+    // UPDATE id_flow menjadi 2 dan flow string menjadi "Verifikasi"
+    await TrxBeasiswa.update(
+      { 
+        id_flow: 2,
+        flow: "Verifikasi"
+      },
+      { 
+        where: { id_trx_beasiswa },
+        transaction: t
+      }
+    );
+
+    await TrxLogKembalikanKeSelektor.create(
+      {
+        id_trx_beasiswa: pendaftar.id_trx_beasiswa,
+        id_flow_sebelumnya: idFlowSebelumnya,
+        alasan: alasan || "Dikembalikan ke flow 2 melalui Laporan Pendaftar",
+        created_by: req.user ? req.user.username : "admin beasiswa", 
+        created_at: new Date()
+      },
+      { transaction: t }
+    );
+
+    await t.commit();
+
+    return successResponse(res, "Berhasil mengembalikan status pendaftar ke flow 2 dan mencatat log.");
+  } catch (error) {
+    await t.rollback();
+    console.error("Error merubah flow:", error);
+    return errorResponse(res, "Internal Server Error saat merubah flow.");
   }
 };
