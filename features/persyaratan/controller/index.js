@@ -106,8 +106,7 @@ exports.uploadPersyaratan = async (req, res) => {
           {
             nama_dokumen_persyaratan,
             file: filename,
-            timestamp: new Date(),
-            verifikator_catatan: null,
+            timestamp: new Date(), 
             is_kabkota: is_true_kabkot,
             is_prov: is_true_prov,
           },
@@ -116,13 +115,13 @@ exports.uploadPersyaratan = async (req, res) => {
         returnData = await TrxDokumenUmum.findOne({ where: { id_trx_beasiswa, id_ref_dokumen } });
       } else if (kategori === "khusus") {
         await TrxDokumenKhusus.update(
-          { nama_dokumen_persyaratan, file: filename, timestamp: new Date(), verifikator_catatan: null },
+          { nama_dokumen_persyaratan, file: filename, timestamp: new Date() },
           { where: { id_trx_beasiswa, id_ref_dokumen } }
         );
         returnData = await TrxDokumenKhusus.findOne({ where: { id_trx_beasiswa, id_ref_dokumen } });
       } else if (kategori === "dinas") {
         await TrxDokumenDinasDaerah.update(
-          { nama_dokumen_persyaratan, file: filename, timestamp: new Date(), verifikator_catatan: null },
+          { nama_dokumen_persyaratan, file: filename, timestamp: new Date() },
           { where: { id_trx_beasiswa, id_ref_dokumen } }
         );
         returnData = await TrxDokumenDinasDaerah.findOne({ where: { id_trx_beasiswa, id_ref_dokumen } });
@@ -188,20 +187,31 @@ exports.getPersyaratanUploaded = async (req, res) => {
     const { kategori, idTrxBeasiswa } = req.params;
 
     let uploaded;
+    // DITAMBAHKAN timestamp dan verifikator_timestamp untuk validasi waktu frontend
+    const attributes = [
+      "id_ref_dokumen", 
+      "nama_dokumen_persyaratan", 
+      "file", 
+      "verifikator_catatan", 
+      "timestamp", 
+      "verifikator_timestamp", 
+      "verifikator_dinas_timestamp"
+    ];
+
     if (kategori === "umum") {
       uploaded = await TrxDokumenUmum.findAll({
         where: { id_trx_beasiswa: idTrxBeasiswa },
-        attributes: ["id_ref_dokumen", "nama_dokumen_persyaratan", "file", "verifikator_catatan"],
+        attributes: attributes,
       });
     } else if (kategori === "khusus") {
       uploaded = await TrxDokumenKhusus.findAll({
         where: { id_trx_beasiswa: idTrxBeasiswa },
-        attributes: ["id_ref_dokumen", "nama_dokumen_persyaratan", "file", "verifikator_catatan"],
+        attributes: attributes,
       });
     } else if (kategori === "dinas") {
       uploaded = await TrxDokumenDinasDaerah.findAll({
         where: { id_trx_beasiswa: idTrxBeasiswa },
-        attributes: ["id_ref_dokumen", "nama_dokumen_persyaratan", "file", "verifikator_catatan"],
+        attributes: attributes,
       });
     }
 
@@ -210,6 +220,8 @@ exports.getPersyaratanUploaded = async (req, res) => {
       nama_dokumen_persyaratan: item.nama_dokumen_persyaratan,
       verifikator_catatan: item.verifikator_catatan,
       file: getFileUrl(req, "persyaratan", item.file),
+      waktu_upload: item.timestamp,
+      waktu_catatan: item.verifikator_timestamp || item.verifikator_dinas_timestamp || null
     }));
 
     return successResponse(res, "Data berhasil dimuat", mappedData);
@@ -260,7 +272,6 @@ exports.uploadFileSK = async (req, res) => {
     const { idBeasiswa } = req.params;
     const { kode_kab, kode_prov, nama_dinas_kabkota, nama_dinas_provinsi } = req.user;
     
-    // ✅ PERBAIKAN: Menyimpan Full Path tanpa .split('/').pop()
     const filename = req.file.filename || req.file.key || null;
     if (!filename) return failResponse(res, "Gagal mendapatkan nama file dari sistem penyimpanan");
     
@@ -291,7 +302,6 @@ exports.uploadFileSKProvinsi = async (req, res) => {
     const { idBeasiswa } = req.params;
     const { kode_kab, kode_prov, nama_dinas_kabkota, nama_dinas_provinsi } = req.user;
     
-    // ✅ PERBAIKAN: Menyimpan Full Path tanpa .split('/').pop()
     const filename = req.file.filename || req.file.key || null;
     if (!filename) return failResponse(res, "Gagal mendapatkan nama file dari sistem penyimpanan");
     
@@ -322,7 +332,6 @@ exports.uploadFileBA = async (req, res) => {
     const { idBeasiswa } = req.params;
     const { kode_kab, kode_prov, nama_dinas_kabkota, nama_dinas_provinsi } = req.user;
     
-    // ✅ PERBAIKAN: Menyimpan Full Path tanpa .split('/').pop()
     const filename = req.file.filename || req.file.key || null;
     if (!filename) return failResponse(res, "Gagal mendapatkan nama file dari sistem penyimpanan");
     
@@ -353,7 +362,6 @@ exports.uploadFileBAProvinsi = async (req, res) => {
     const { idBeasiswa } = req.params;
     const { kode_kab, kode_prov, nama_dinas_kabkota, nama_dinas_provinsi } = req.user;
     
-    // ✅ PERBAIKAN: Menyimpan Full Path tanpa .split('/').pop()
     const filename = req.file.filename || req.file.key || null;
     if (!filename) return failResponse(res, "Gagal mendapatkan nama file dari sistem penyimpanan");
     

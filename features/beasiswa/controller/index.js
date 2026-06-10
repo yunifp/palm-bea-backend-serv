@@ -790,10 +790,12 @@ exports.getFullDataBeasiswa = async (req, res) => {
 
     const persyaratanUmum = await TrxDokumenUmum.findAll({
       where: { id_trx_beasiswa: idTrxBeasiswa },
+      order: [['id_ref_dokumen', 'ASC']]
     });
 
     const persyaratanKhusus = await TrxDokumenKhusus.findAll({
       where: { id_trx_beasiswa: idTrxBeasiswa },
+      order: [['id_ref_dokumen', 'ASC']]
     });
 
     const persyaratanDinas = await TrxDokumenDinasDaerah.findAll({
